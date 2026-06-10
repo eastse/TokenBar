@@ -1,5 +1,6 @@
 import AppKit
 import SwiftUI
+import TokenBarCore
 
 /// Owns the NSStatusItem and its NSPopover (AppKit-hosted icon, SwiftUI
 /// popover content — the codexbar pattern). Later phases talk to it through
@@ -31,8 +32,14 @@ final class StatusItemController: NSObject {
             button.toolTip = "TokenBar"
             button.target = self
             button.action = #selector(togglePopover(_:))
+            // Right-click opens the quota-source menu (battery-icon pattern).
+            button.sendAction(on: [.leftMouseUp, .rightMouseUp])
         }
     }
+
+    /// Supplies the latest quota payload for the right-click menu
+    /// (AppDelegate wires this to the tray animator's cache).
+    var quotaPayloadProvider: (() -> AgentUsagePayload?)?
 
     /// Swaps the menu-bar icon image (an animation frame).
     func setFrame(_ image: NSImage) {
@@ -86,10 +93,73 @@ final class StatusItemController: NSObject {
     }
 
     @objc private func togglePopover(_ sender: Any?) {
+        if NSApp.currentEvent?.type == .rightMouseUp {
+            showQuotaMenu()
+            return
+        }
         if popover.isShown {
             closePopover()
         } else {
             showPopover()
         }
+    }
+
+    // MARK: - Right-click quota-source menu
+
+    /// "What does the icon track?" — Auto plus every known quota window with
+    /// its live remaining percent, checkmark on the current pick. Writes the
+    /// same defaults key the settings panel edits; the icon follows within a
+    /// couple of seconds.
+    private func showQuotaMenu() {
+        let menu = NSMenu()
+        let current = UserDefaults.standard.string(forKey: TrayAnimator.quotaSourceKey)
+            ?? QuotaResolver.auto
+
+        let header = NSMenuItem(title: "Menu bar tracks", action: nil, keyEquivalent: "")
+        header.isEnabled = false
+        menu.addItem(header)
+
+        func add(_ title: String, selection: String) {
+            let item = NSMenuItem(
+                title: title, action: #selector(pickQuotaSource(_:)), keyEquivalent: "")
+            item.target = self
+            item.representedObject = selection
+            item.state = selection == current ? .on : .off
+            menu.addItem(item)
+        }
+        add("Auto (tightest window)", selection: QuotaResolver.auto)
+
+        if let payload = quotaPayloadProvider?() {
+            for agent in payload.agents where agent.error == nil && !agent.windows.isEmpty {
+                menu.addItem(.separator())
+                let name = NSMenuItem(
+                    title: ClientRegistry.style(agent.clientId).displayName,
+                    action: nil, keyEquivalent: "")
+                name.isEnabled = false
+                menu.addItem(name)
+                for window in agent.windows {
+                    let left = "\(Int(min(100, max(0, window.remainingPercent)).rounded()))% left"
+                    add(
+                        "\(window.label) — \(left)",
+                        selection: QuotaResolver.selection(
+                            clientId: agent.clientId, label: window.label))
+                }
+            }
+        } else {
+            let loading = NSMenuItem(title: "Loading quotas…", action: nil, keyEquivalent: "")
+            loading.isEnabled = false
+            menu.addItem(loading)
+        }
+
+        // Pop up via a transient menu assignment so the next left-click still
+        // toggles the popover instead of re-opening the menu.
+        statusItem.menu = menu
+        statusItem.button?.performClick(nil)
+        statusItem.menu = nil
+    }
+
+    @objc private func pickQuotaSource(_ sender: NSMenuItem) {
+        guard let selection = sender.representedObject as? String else { return }
+        UserDefaults.standard.set(selection, forKey: TrayAnimator.quotaSourceKey)
     }
 }

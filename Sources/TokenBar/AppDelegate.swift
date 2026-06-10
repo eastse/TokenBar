@@ -18,6 +18,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         statusController = controller
         let animator = TrayAnimator(controller: controller)
         trayAnimator = animator
+        controller.quotaPayloadProvider = { [weak animator] in animator?.quota }
         animator.start()
         startTitleRefresh()
 
