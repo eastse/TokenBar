@@ -1,5 +1,13 @@
-import Foundation
+import AppKit
 
-// Entry point. The menu-bar app shell lands next; until then the executable
-// still runs the smoke flow directly (CI already invokes it as `--smoke`).
-exit(Smoke.run())
+// Entry point. `--smoke` keeps the Phase 1 CLI bridge check available for CI;
+// anything else boots the menu-bar app (no storyboard, no .app bundle yet).
+
+if CommandLine.arguments.contains("--smoke") {
+    exit(Smoke.run())
+}
+
+let app = NSApplication.shared
+let delegate = AppDelegate()
+app.delegate = delegate
+app.run()
