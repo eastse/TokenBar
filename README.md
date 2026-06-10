@@ -18,7 +18,7 @@ Liquid Glass on macOS 26+.
 | 3 | Menu-bar shell: NSStatusItem + popover + Liquid Glass/vibrancy | ✅ |
 | 4 | Overview lens: usage chart, model breakdown, streaks | ✅ |
 | 5 | Remaining lenses: Models / Daily / Hourly / Stats / Agents + tabs | ✅ |
-| 6 | Agent limits + pace + live trace + settings | 6.0–6.1 ✅ |
+| 6 | Agent limits + pace + live trace + settings | 6.0–6.2 ✅ |
 | 7 | 3D contribution graph integration | — |
 | 8 | Cat animation, shortcuts, autostart | — |
 | 9 | Sparkle updater, signing, packaging, release CI | — |
