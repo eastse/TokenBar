@@ -16,8 +16,11 @@ final class StatusItemController: NSObject {
         super.init()
 
         popover.behavior = .transient
-        popover.contentSize = NSSize(width: 360, height: 480)
-        let host = NSHostingController(rootView: PopoverView())
+        // Size to the screen: ~60% of the visible height reads much better
+        // on tall displays than the original fixed 480pt.
+        let height = max(480, ((NSScreen.main?.visibleFrame.height ?? 900) * 0.6).rounded())
+        popover.contentSize = NSSize(width: 360, height: height)
+        let host = NSHostingController(rootView: PopoverView(popoverHeight: height))
         // The SwiftUI root has a fixed frame; let the popover keep our size
         // instead of chasing intrinsic-size updates.
         host.sizingOptions = []

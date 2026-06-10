@@ -5,6 +5,9 @@ import TokenBarCore
 /// Popover root: view-switch row + lens router over a shared DashboardModel.
 /// Per-client tabs join in a later phase.
 struct PopoverView: View {
+    /// Set by the status-item controller from the screen size.
+    var popoverHeight: CGFloat = 480
+
     @State private var model = DashboardModel()
     @State private var tokensPerMin: Double?
     /// `--settings` opens straight onto the settings panel (debug/screenshot aid).
@@ -59,7 +62,7 @@ struct PopoverView: View {
             Divider()
             footer
         }
-        .frame(width: 360, height: 480)
+        .frame(width: 360, height: popoverHeight)
         .background(GlassBackground().ignoresSafeArea())
         .task { await model.load() }
         .task(id: activeViewRaw) {

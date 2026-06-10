@@ -10,6 +10,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var statusController: StatusItemController?
     private var trayAnimator: TrayAnimator?
     private var titleRefreshTask: Task<Void, Never>?
+    private var defaultsObserver: NSObjectProtocol?
+    // Last good fetches — a failed refresh keeps showing these.
+    private var lastGraph: UsagePayload?
+    private var lastRate: Double?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(.accessory)
@@ -19,8 +23,22 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let animator = TrayAnimator(controller: controller)
         trayAnimator = animator
         controller.quotaPayloadProvider = { [weak animator] in animator?.quota }
+        // A fresh quota fetch re-renders the title right away (the quota
+        // title mode shouldn't wait out the next 60s tick).
+        animator.onQuotaUpdated = { [weak self] in self?.applyTitle() }
         animator.start()
         startTitleRefresh()
+
+        // Re-render the title the moment a setting changes (tray mode, quota
+        // source from the right-click menu or the panel) instead of waiting
+        // out the 60s refresh tick. Cheap: recomputes from cached data only.
+        defaultsObserver = NotificationCenter.default.addObserver(
+            forName: UserDefaults.didChangeNotification, object: nil, queue: .main
+        ) { _ in
+            MainActor.assumeIsolated {
+                (NSApp.delegate as? AppDelegate)?.applyTitle()
+            }
+        }
 
         // Debug hook: `swift run TokenBar --open-popover` shows the popover
         // shortly after launch so it can be screenshotted without a click.
@@ -34,6 +52,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationWillTerminate(_ notification: Notification) {
         titleRefreshTask?.cancel()
         trayAnimator?.stop()
+        if let defaultsObserver { NotificationCenter.default.removeObserver(defaultsObserver) }
+    }
+
+    /// Compose the tray title from the cached data and the current settings.
+    private func applyTitle() {
+        let mode = TrayMode.current
+        let quotaRemaining = trayAnimator?.quotaRemaining
+        statusController?.updateTitle(
+            mode.title(graph: lastGraph, tokensPerMin: lastRate, quotaRemaining: quotaRemaining),
+            color: mode.titleColor(quotaRemaining: quotaRemaining))
     }
 
     /// Refreshes the tray title every 60s in the user's chosen mode. Reads
@@ -43,10 +71,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private func startTitleRefresh() {
         titleRefreshTask = Task { [weak self] in
             var lastFullRefresh = Date.distantPast
-            // A failed refresh keeps showing the last good numbers — the
-            // title must never blank/zero out on a transient error.
-            var lastGraph: UsagePayload?
-            var lastRate: Double?
             while !Task.isCancelled {
                 let mode = TrayMode.current
                 let intervalMin = max(1, UserDefaults.standard.object(forKey: "tokenbar.refresh.intervalMin")
@@ -56,20 +80,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                     forceRefresh ? try TBCore.refreshGraph() : try TBCore.graph()
                 }.value
                 if forceRefresh && graph != nil { lastFullRefresh = Date() }
-                if let graph { lastGraph = graph }
+                // Failed refreshes keep the last good numbers — the title
+                // must never blank/zero out on a transient error.
+                if let graph { self?.lastGraph = graph }
                 if mode == .tokensPerMin {
                     let rate = try? await Task.detached(priority: .utility) {
                         try TBCore.tokensPerMin()
                     }.value
-                    if let rate { lastRate = rate }
+                    if let rate { self?.lastRate = rate }
                 }
                 guard !Task.isCancelled else { break }
-                let quotaRemaining = self?.trayAnimator?.quotaRemaining
-                self?.statusController?.updateTitle(
-                    mode.title(
-                        graph: lastGraph, tokensPerMin: lastRate,
-                        quotaRemaining: quotaRemaining),
-                    color: mode.titleColor(quotaRemaining: quotaRemaining))
+                self?.applyTitle()
                 try? await Task.sleep(for: .seconds(Double(Self.titleRefreshSecs)))
             }
         }

@@ -24,6 +24,8 @@ final class TrayAnimator {
     /// Latest OAuth quota snapshot — feeds the gauge icon styles and the
     /// quota title mode (AppDelegate reads it through `quotaRemaining`).
     private(set) var quota: AgentUsagePayload?
+    /// Fired after every successful quota fetch (title refresh hook).
+    var onQuotaUpdated: (() -> Void)?
 
     init(controller: StatusItemController) {
         self.controller = controller
@@ -149,7 +151,10 @@ final class TrayAnimator {
                     try TBCore.agentUsage()
                 }.value
                 guard let self, !Task.isCancelled else { break }
-                if let payload { self.quota = payload }
+                if let payload {
+                    self.quota = payload
+                    self.onQuotaUpdated?()
+                }
                 try? await Task.sleep(for: .seconds(300))
             }
         }
