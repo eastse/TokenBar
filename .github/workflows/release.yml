@@ -82,14 +82,44 @@ jobs:
           scripts/make_appcast.sh "TokenBar.app.tar.gz" "$VERSION" "$BUILD" "$GITHUB_REF_NAME" /tmp/sparkle_ed.key release-notes.txt
           rm -f /tmp/sparkle_ed.key
 
+      # Tauri migration manifest: the old Tauri app's updater endpoint
+      # (github.com/Nanako0129/TokenBar/releases/latest/download/latest.json)
+      # now resolves to this repo. A stable release drops a Tauri-format
+      # latest.json signed with the same minisign updater key, so the Tauri
+      # app accepts the archive and swaps itself for the native build (same
+      # app name + bundle id, file-level replace). Stable only — prereleases
+      # are excluded from releases/latest, so they'd never serve this anyway.
+      - name: Tauri migration manifest (stable only)
+        if: ${{ !contains(github.ref_name, '-') }}
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          npx --yes @tauri-apps/cli@latest signer sign \
+            -k "$TAURI_SIGNING_PRIVATE_KEY" "TokenBar.app.tar.gz" >/dev/null
+          SIG=$(cat TokenBar.app.tar.gz.sig)
+          NOTES_JSON=$(jq -Rs . < release-notes.txt)
+          PUB=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+          URL="https://github.com/Nanako0129/TokenBar/releases/download/$GITHUB_REF_NAME/TokenBar.app.tar.gz"
+          jq -n --arg v "$VERSION" --argjson n "$NOTES_JSON" --arg p "$PUB" \
+            --arg s "$SIG" --arg u "$URL" \
+            '{version:$v, notes:$n, pub_date:$p,
+              platforms:{"darwin-aarch64":{signature:$s, url:$u}}}' > latest.json
+          echo "----- latest.json -----"; cat latest.json
+
       - name: Create GitHub release
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           PRERELEASE_FLAG=""
-          case "$VERSION" in *-*) PRERELEASE_FLAG="--prerelease";; esac
+          ASSETS="TokenBar.app.tar.gz"
+          case "$VERSION" in
+            *-*) PRERELEASE_FLAG="--prerelease";;
+            *) ASSETS="$ASSETS latest.json";;  # Tauri migration manifest
+          esac
           gh release create "$GITHUB_REF_NAME" \
-            "TokenBar.app.tar.gz" \
+            $ASSETS \
             --title "TokenBar $VERSION" \
             --notes-file release-notes.txt $PRERELEASE_FLAG
 
