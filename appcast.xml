@@ -13,29 +13,17 @@
       <description><![CDATA[
 <b>New:</b>
 <ul>
-<li>Bring back the year filter from the Tauri HeaderBar</li>
-<li>Aurora wallpaper + liquid-glass design system</li>
-<li>Menu-bar nav + popover hero orchestration</li>
-<li>Glass panels everywhere + v1.x copy + melting popsicle</li>
-<li>/zh-tw/ locale + hreflang</li>
-<li>1200x630 OG brand card + JSON-LD/llms.txt refresh</li>
-<li>Oiiai cat + Party Parrot join the critter band</li>
-<li>Og-card v2 with real popover + sharper title/description</li>
-<li>Real app icon beside the TokenBar wordmark</li>
-<li>FAQPage JSON-LD, sitemap hreflang, self-hosted fonts</li>
+<li>Bring back the dashboard year filter</li>
 <li>Standalone settings window with live preview column</li>
-<li>Credit contributors in AI release notes</li>
+</ul>
+<b>Performance:</b>
+<ul>
+<li>Stop re-reading and re-aggregating unchanged session history on every tick — much lower CPU and memory on large histories</li>
 </ul>
 <b>Fixes:</b>
 <ul>
-<li>Let the brew command wrap inside a 350px column</li>
-<li>App-icon favicon, straighten 3D card, 2x hero popover</li>
-<li>Drop the Apple logo glyph from menu-bar mocks</li>
-<li>Drive the popsicle melt with JavaScript — WebKit lacks CSS d:path()</li>
-<li>Waifu2x upscale for the hero popover — crisper text</li>
 <li>Open the settings window dead-center on screen</li>
 <li>Never mtime-prune Hermes/Zed dbs; probe their -wal sidecars</li>
-<li>Stop re-reading and re-aggregating unchanged session history</li>
 </ul>
 <p>Thanks: @aiexkwan</p>
       ]]></description>
