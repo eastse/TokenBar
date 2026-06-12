@@ -13,6 +13,7 @@ build: rust
 	swift build
 
 run: rust
+	@$(call relink_if_stale,debug)
 	swift run TokenBar
 
 clean:

@@ -177,7 +177,7 @@ impl UsageTailer {
                 tokens_per_min: tokens as f32 / window_min,
             })
             .collect();
-        out.sort_by(|a, b| b.tokens.cmp(&a.tokens));
+        out.sort_by_key(|b| std::cmp::Reverse(b.tokens));
         out
     }
 }
