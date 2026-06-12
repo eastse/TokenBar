@@ -1,8 +1,9 @@
 /* ============================================================================
    TokenBar landing — design system
-   Data-viz / observatory aesthetic. Near-black canvas, warm-clay primary accent
-   (Anthropic's hue — deliberately NOT the usual blue/purple), and the full
-   provider palette reserved for the live data (the heatmap, view labels).
+   "Liquid Glass mirror": the page *is* a Mac desktop. An aurora wallpaper
+   (violet blobs, pink + data-cyan collisions — not a linear gradient), a real
+   28px menu bar pinned on top, and every content block floating as a glass
+   panel — the same scrim + blur recipe the native app uses.
    ========================================================================== */
 
 :root {
@@ -23,48 +24,58 @@
   --accent-pink: #ff5d8f; /* secondary, from the avatar's flag/blush pink */
   --on-accent: #161228; /* dark ink for text sitting on the bright accent */
 
-  /* dark canvas (default) */
-  --bg: #0a0b0e;
-  --bg-grad-1: #12100f;
-  --bg-grad-2: #0a0b0e;
-  --panel: #131620;
-  --panel-2: #1a1e2a;
+  /* quota gauge palette — mirrors TrayIcons.gaugeColor */
+  --gauge-ok: #21c45e;
+  --gauge-warn: #f59e0b;
+  --gauge-low: #f04545;
+
+  /* dark desktop (default) */
+  --bg: #08070d;
+  --panel: #15131f; /* no-backdrop-filter fallback only */
   --line: rgba(255, 255, 255, 0.09);
   --line-strong: rgba(255, 255, 255, 0.16);
-  --ink: #edeef2;
-  --ink-dim: #c3c7d0;
-  --muted: #969cab;
-  --faint: #5b606d;
+  --ink: #f0eff5;
+  --ink-dim: #c6c5d4;
+  --muted: #9a98ad;
+  --faint: #5e5c70;
+
+  /* liquid glass recipe — mirrors the app: scrim over blur, hairline, top sheen */
+  --glass-scrim: rgba(12, 11, 20, 0.4);
+  --glass-scrim-deep: rgba(10, 9, 17, 0.56);
+  --glass-edge: rgba(255, 255, 255, 0.14);
+  --glass-sheen: rgba(255, 255, 255, 0.1);
+  --glass-shadow: 0 24px 70px -30px rgba(0, 0, 0, 0.75);
 
   --font-display: 'Bricolage Grotesque', 'Hanken Grotesk', system-ui, sans-serif;
   --font-body: 'Hanken Grotesk', system-ui, -apple-system, sans-serif;
   --font-mono: 'JetBrains Mono', ui-monospace, 'SF Mono', Menlo, monospace;
 
-  --radius: 16px;
-  --radius-sm: 10px;
+  --radius: 20px;
+  --radius-sm: 12px;
   --maxw: 1140px;
-  --shadow: 0 1px 0 rgba(255, 255, 255, 0.04) inset, 0 24px 60px -24px rgba(0, 0, 0, 0.7);
+  --menubar-h: 30px;
 }
 
 @media (prefers-color-scheme: light) {
   :root {
-    --bg: #f4f1ec;
-    --bg-grad-1: #f7e9e0;
-    --bg-grad-2: #f4f1ec;
-    --panel: #ffffff;
-    --panel-2: #faf7f2;
-    --line: rgba(20, 16, 12, 0.10);
-    --line-strong: rgba(20, 16, 12, 0.18);
-    --ink: #1a1714;
-    --ink-dim: #3c3833;
-    --muted: #6b6760;
-    --faint: #a7a299;
+    --bg: #e9e6f4;
+    --panel: #f7f6fc;
+    --line: rgba(28, 22, 48, 0.1);
+    --line-strong: rgba(28, 22, 48, 0.18);
+    --ink: #1b1726;
+    --ink-dim: #3d3850;
+    --muted: #6c6781;
+    --faint: #a4a0b5;
     --accent: #6849e0;
     --accent-bright: #7c6cff;
     --accent-deep: #4f37c4;
     --accent-pink: #e84d80;
     --on-accent: #ffffff;
-    --shadow: 0 1px 0 rgba(255, 255, 255, 0.6) inset, 0 24px 50px -28px rgba(60, 40, 110, 0.35);
+    --glass-scrim: rgba(255, 255, 255, 0.42);
+    --glass-scrim-deep: rgba(255, 255, 255, 0.6);
+    --glass-edge: rgba(255, 255, 255, 0.6);
+    --glass-sheen: rgba(255, 255, 255, 0.85);
+    --glass-shadow: 0 24px 60px -30px rgba(56, 36, 110, 0.4);
   }
 }
 
@@ -84,16 +95,32 @@ body {
   position: relative;
 }
 
-/* atmosphere: warm radial bloom top-center + fine grain overlay */
+/* ---------------------------------------------------------------------------
+   The wallpaper: aurora blobs (accent / pink / deep violet / a data-cyan spark)
+   drifting very slowly. Oversized + fixed so the drift never exposes an edge.
+   -------------------------------------------------------------------------- */
 body::before {
   content: '';
   position: fixed;
-  inset: 0;
+  inset: -22%;
   z-index: -2;
   background:
-    radial-gradient(1200px 700px at 50% -10%, color-mix(in oklab, var(--accent) 22%, transparent), transparent 70%),
-    linear-gradient(180deg, var(--bg-grad-1), var(--bg-grad-2) 40%);
+    radial-gradient(38% 34% at 24% 26%, color-mix(in oklab, var(--accent) 34%, transparent), transparent 70%),
+    radial-gradient(30% 28% at 80% 14%, color-mix(in oklab, var(--accent-pink) 17%, transparent), transparent 70%),
+    radial-gradient(46% 40% at 72% 76%, color-mix(in oklab, var(--accent-deep) 38%, transparent), transparent 72%),
+    radial-gradient(22% 20% at 42% 88%, color-mix(in oklab, var(--p-google) 12%, transparent), transparent 70%),
+    radial-gradient(26% 24% at 8% 70%, color-mix(in oklab, var(--accent-deep) 22%, transparent), transparent 70%),
+    var(--bg);
+  animation: aurora 120s ease-in-out infinite alternate;
+  will-change: transform;
 }
+@keyframes aurora {
+  from { transform: translate3d(-1.5%, -1%, 0) scale(1); }
+  50% { transform: translate3d(1%, 1.5%, 0) scale(1.04); }
+  to { transform: translate3d(2%, -0.5%, 0) scale(1); }
+}
+
+/* fine grain so the glass has something to bite on */
 body::after {
   content: '';
   position: fixed;
@@ -119,11 +146,38 @@ a { color: inherit; text-decoration: none; }
   font-size: 12px;
   letter-spacing: 0.22em;
   text-transform: uppercase;
-  color: var(--accent);
+  color: var(--accent-bright);
+}
+@media (prefers-color-scheme: light) {
+  .eyebrow { color: var(--accent); }
 }
 
-/* shared section rhythm */
-.section { padding: clamp(72px, 11vw, 140px) 0; position: relative; }
+/* ---------------------------------------------------------------------------
+   .glass — the app's card recipe, verbatim: scrim + blur(22) saturate(1.4),
+   1px hairline, top inner sheen, soft drop. NEVER nest .glass inside .glass
+   (renders as a murky slab in the app too); in-card controls use translucent
+   primary fills instead.
+   -------------------------------------------------------------------------- */
+.glass {
+  position: relative;
+  border-radius: var(--radius);
+  border: 1px solid var(--glass-edge);
+  background: var(--glass-scrim);
+  -webkit-backdrop-filter: blur(22px) saturate(1.4);
+  backdrop-filter: blur(22px) saturate(1.4);
+  box-shadow: inset 0 1px 0 var(--glass-sheen), var(--glass-shadow);
+}
+.glass-deep { background: var(--glass-scrim-deep); }
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .glass { background: var(--panel); }
+}
+
+/* translucent fills for controls living *inside* glass (no nested blur) */
+.quiet-fill { background: color-mix(in oklab, var(--ink) 8%, transparent); }
+.quiet-fill-strong { background: color-mix(in oklab, var(--ink) 14%, transparent); }
+
+/* shared section rhythm — generous air between floating panels */
+.section { padding: clamp(84px, 12vw, 168px) 0; position: relative; }
 .section-head { max-width: 640px; margin-bottom: 48px; }
 .section-head h2 { font-size: clamp(30px, 5vw, 50px); margin: 14px 0 16px; }
 .section-head p { color: var(--muted); font-size: 18px; }
@@ -145,11 +199,21 @@ a { color: inherit; text-decoration: none; }
 .btn-ghost { border-color: var(--line-strong); color: var(--ink); }
 .btn-ghost:hover { border-color: var(--accent); color: var(--accent-bright); transform: translateY(-2px); }
 
-/* reveal-on-load helper (staggered) */
+/* load-time reveal (hero only) */
 @keyframes rise { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: none; } }
 .rise { opacity: 0; animation: rise .7s cubic-bezier(.22,.61,.36,1) forwards; }
+
+/* scroll-time reveal — Base.astro's IntersectionObserver flips on .in;
+   stagger children with --rd (reveal delay) */
+.reveal {
+  opacity: 0;
+  transform: translateY(26px);
+  transition: opacity .8s ease var(--rd, 0s), transform .8s cubic-bezier(.22,.61,.36,1) var(--rd, 0s);
+}
+.reveal.in { opacity: 1; transform: none; }
 
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation: none !important; transition: none !important; }
   html { scroll-behavior: auto; }
+  .rise, .reveal { opacity: 1 !important; transform: none !important; }
 }
