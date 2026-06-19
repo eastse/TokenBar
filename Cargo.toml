@@ -5,3 +5,9 @@ members = ["crates/tb_core_ffi", "vendor/tokscale-core"]
 [profile.release]
 lto = true
 strip = "debuginfo"
+# This builds a staticlib called over a C ABI from Swift. A panic must never
+# unwind across that boundary (UB), and we can't catch_unwind every entry
+# point cheaply, so abort on panic: a panic anywhere — including in serde,
+# tokio or reqwest — terminates the process deterministically instead of
+# unwinding into undefined behavior. Tests still unwind (dev profile).
+panic = "abort"
