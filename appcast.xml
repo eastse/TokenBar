@@ -3,6 +3,21 @@
     <channel>
         <title>TokenBar updates</title>
         <item>
+            <title>1.1.3</title>
+            <pubDate>Wed, 24 Jun 2026 19:05:58 +0000</pubDate>
+            <link>https://github.com/Nanako0129/TokenBar/releases/tag/v1.1.3</link>
+            <sparkle:version>171</sparkle:version>
+            <sparkle:shortVersionString>1.1.3</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
+            <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>
+            <description><![CDATA[<b>Fixes:</b>
+<ul>
+<li>Dashboard no longer flashes a loading indicator each time you open the popover</li>
+</ul>
+]]></description>
+            <enclosure url="https://github.com/Nanako0129/TokenBar/releases/download/v1.1.3/TokenBar.app.tar.gz" length="7067818" type="application/octet-stream" sparkle:edSignature="JBwW1pPabLaE7N4bARW+vNsXX+F1HOAQlPyfI0tr/zjbLkAglcOBg9vs6eBORB2N2RCYdyJ6zIlH7GyH2rqGCg=="/>
+        </item>
+        <item>
             <title>1.1.2</title>
             <pubDate>Wed, 24 Jun 2026 16:52:16 +0000</pubDate>
             <link>https://github.com/Nanako0129/TokenBar/releases/tag/v1.1.2</link>
