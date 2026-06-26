@@ -24,6 +24,10 @@ final class TrayAnimator {
     /// Latest OAuth quota snapshot — feeds the gauge icon styles and the
     /// quota title mode (AppDelegate reads it through `quotaRemaining`).
     private(set) var quota: AgentUsagePayload?
+    /// Latest live trace, refreshed alongside the load poll. Only consulted
+    /// when the user picks the "Following (last used)" quota source; kept on
+    /// hand so resolving doesn't pay a synchronous FFI hop per render pass.
+    private var trace: [TraceBucket] = []
     /// Fired after every successful quota fetch (title refresh hook).
     var onQuotaUpdated: (() -> Void)?
 
@@ -148,7 +152,7 @@ final class TrayAnimator {
     var quotaRemaining: Double? {
         let selection = UserDefaults.standard.string(forKey: Self.quotaSourceKey)
             ?? QuotaResolver.auto
-        if let value = QuotaResolver.resolve(payload: quota, selection: selection)?
+        if let value = QuotaResolver.resolve(payload: quota, trace: trace, selection: selection)?
             .window.remainingPercent
         {
             cachedQuotaRemaining = value
@@ -255,13 +259,14 @@ final class TrayAnimator {
     private func startLoadPolling() {
         loadTask = Task { [weak self] in
             while !Task.isCancelled {
-                let rate = try? await Task.detached(priority: .utility) {
-                    try TBCore.tokensPerMin()
+                let probe = try? await Task.detached(priority: .utility) {
+                    (try TBCore.tokensPerMin(), try TBCore.usageTrace(windowSecs: 600))
                 }.value
                 guard let self, !Task.isCancelled else { break }
-                if let rate {
+                if let (rate, trace) = probe {
                     self.load = min(rate / 10_000.0, 100.0)
                     self.tokensPerMinRate = rate
+                    self.trace = trace
                     self.onQuotaUpdated?()
                 }
                 try? await Task.sleep(for: .seconds(30))

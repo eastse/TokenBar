@@ -93,9 +93,21 @@ struct AgentLimitsCard: View {
             Self.placeholderRows[id] != nil || snapshots[id] != nil
         }
         if restrict { return clients.filter(known) }
+        // Hide agents the user has no trace of on this machine: a snapshot
+        // alone isn't enough (the backend returns an error card for codex /
+        // claude / antigravity even when their auth file is missing, i.e. the
+        // CLI isn't installed or signed in). Require either real quota data,
+        // historical usage (clients = presentClients), or live activity.
+        let presentSet = Set(clients)
+        let live = liveClients
+        func used(_ id: String) -> Bool {
+            if presentSet.contains(id) || live.contains(id) { return true }
+            if let snapshot = snapshots[id], !snapshot.windows.isEmpty { return true }
+            return false
+        }
         var seen = Set<String>()
         return (clients.filter(known) + (agentUsage?.agents.map(\.clientId) ?? []))
-            .filter { seen.insert($0).inserted }
+            .filter { used($0) && seen.insert($0).inserted }
     }
 
     /// Saved drag order applied; ids without a saved position keep their

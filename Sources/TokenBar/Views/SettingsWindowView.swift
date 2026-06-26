@@ -55,10 +55,12 @@ struct SettingsWindowView: View {
                 VStack(spacing: 6) {
                     MenuBarMock(
                         dark: true, graph: model.payload,
-                        tokensPerMin: tokensPerMin, agentUsage: model.agentUsage)
+                        tokensPerMin: tokensPerMin, agentUsage: model.agentUsage,
+                        trace: model.trace)
                     MenuBarMock(
                         dark: false, graph: model.payload,
-                        tokensPerMin: tokensPerMin, agentUsage: model.agentUsage)
+                        tokensPerMin: tokensPerMin, agentUsage: model.agentUsage,
+                        trace: model.trace)
                 }
             }
 
@@ -105,6 +107,7 @@ private struct MenuBarMock: View {
     let graph: UsagePayload?
     let tokensPerMin: Double?
     let agentUsage: AgentUsagePayload?
+    let trace: [TraceBucket]
 
     @AppStorage(TrayMode.storageKey) private var trayModeRaw = TrayMode.todayTokens.rawValue
     @AppStorage(TrayAnimator.styleKey) private var animationStyle = "cat"
@@ -160,7 +163,7 @@ private struct MenuBarMock: View {
     /// Mirrors TrayAnimator.quotaRemaining minus the write-back: live resolve
     /// first, then the persisted last-good reading.
     private var quotaRemaining: Double? {
-        QuotaResolver.resolve(payload: agentUsage, selection: quotaSource)?
+        QuotaResolver.resolve(payload: agentUsage, trace: trace, selection: quotaSource)?
             .window.remainingPercent
             ?? UserDefaults.standard.object(forKey: TrayAnimator.lastRemainingKey) as? Double
     }

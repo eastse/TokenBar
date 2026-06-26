@@ -42,12 +42,14 @@ public struct PerDay: Sendable {
     public let date: String
     public let tokens: Int64
     public let cost: Double
+    public let messages: Int
     public let intensity: Int
 
-    public init(date: String, tokens: Int64, cost: Double, intensity: Int) {
+    public init(date: String, tokens: Int64, cost: Double, messages: Int, intensity: Int) {
         self.date = date
         self.tokens = tokens
         self.cost = cost
+        self.messages = messages
         self.intensity = intensity
     }
 }
@@ -85,15 +87,19 @@ public struct UsageStats: Sendable {
         for c in payload.contributions {
             var dayTokens: Int64 = 0
             var dayCost = 0.0
+            var dayMessages = 0
             for cc in c.clients {
                 present.insert(cc.client)
                 guard selectedClients.contains(cc.client) else { continue }
                 let t = cc.tokens
                 dayTokens += t.input + t.output + t.cacheRead + t.cacheWrite + t.reasoning
                 dayCost += cc.cost
+                dayMessages += cc.messages
             }
             if dayTokens == 0 && dayCost == 0 { continue }
-            let entry = PerDay(date: c.date, tokens: dayTokens, cost: dayCost, intensity: c.intensity)
+            let entry = PerDay(
+                date: c.date, tokens: dayTokens, cost: dayCost,
+                messages: dayMessages, intensity: c.intensity)
             perDay.append(entry)
             perDayMap[c.date] = entry
             totalTokens += dayTokens

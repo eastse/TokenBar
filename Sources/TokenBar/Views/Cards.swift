@@ -92,21 +92,31 @@ struct DashCard<Content: View>: View {
 }
 
 /// The three-cell totals row (Total / Tokens / Best day), ported from
-/// TokenUsageCard.tsx in its bare form.
+/// TokenUsageCard.tsx in its bare form. A "today" row sits above it with the
+/// same three-column layout: cost, tokens, and request count for the local
+/// day (resolves to zeroes when today has no usage yet).
 struct TokenUsageRow: View {
     let stats: UsageStats
 
     var body: some View {
-        HStack(spacing: 8) {
-            cell(
-                Format.usd(stats.totalCost), "Total",
-                "\(Format.mmdd(stats.dateRange.start)) → \(Format.mmdd(stats.dateRange.end))")
-            cell(
-                Format.compactTokens(stats.totalTokens), "Tokens",
-                "\(stats.activeDays) active days")
-            cell(
-                stats.bestDay.map { Format.usd($0.cost) } ?? "$0.00", "Best day",
-                stats.bestDay.map { Format.monthDay($0.date) } ?? "—")
+        let today = stats.perDayMap[Format.todayKey()]
+        VStack(spacing: 8) {
+            HStack(spacing: 8) {
+                cell(Format.usd(today?.cost ?? 0), "Spent", "Today")
+                cell(Format.compactTokens(today?.tokens ?? 0), "Tokens", "Today")
+                cell("\((today?.messages ?? 0).formatted())", "Requests", "Today")
+            }
+            HStack(spacing: 8) {
+                cell(
+                    Format.usd(stats.totalCost), "Spent",
+                    "\(Format.mmdd(stats.dateRange.start)) → \(Format.mmdd(stats.dateRange.end))")
+                cell(
+                    Format.compactTokens(stats.totalTokens), "Tokens",
+                    "\(stats.activeDays) active days")
+                cell(
+                    stats.bestDay.map { Format.usd($0.cost) } ?? "$0.00", "Best day",
+                    stats.bestDay.map { Format.monthDay($0.date) } ?? "—")
+            }
         }
     }
 

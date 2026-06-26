@@ -195,6 +195,7 @@ final class StatusItemController: NSObject {
             menu.addItem(item)
         }
         add("Auto (tightest window)", selection: QuotaResolver.auto)
+        add("Following (last used agent)", selection: QuotaResolver.lastUsed)
 
         if let payload = quotaPayloadProvider?() {
             for agent in payload.agents where agent.error == nil && !agent.windows.isEmpty {

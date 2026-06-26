@@ -47,7 +47,7 @@ enum SelfTest {
         // Streaks: longest run vs current run touching the range end.
         func perDay(_ dates: [String]) -> [String: PerDay] {
             Dictionary(uniqueKeysWithValues: dates.map {
-                ($0, PerDay(date: $0, tokens: 10, cost: 1, intensity: 1))
+                ($0, PerDay(date: $0, tokens: 10, cost: 1, messages: 0, intensity: 1))
             })
         }
         let s1 = Streaks.compute(
@@ -111,8 +111,8 @@ enum SelfTest {
         let grid = buildGrid(
             year: "2026",
             perDayMap: [
-                "2026-01-01": PerDay(date: "2026-01-01", tokens: 500, cost: 1, intensity: 1),
-                "2025-12-29": PerDay(date: "2025-12-29", tokens: 900, cost: 1, intensity: 1),
+                "2026-01-01": PerDay(date: "2026-01-01", tokens: 500, cost: 1, messages: 0, intensity: 1),
+                "2025-12-29": PerDay(date: "2025-12-29", tokens: 900, cost: 1, messages: 0, intensity: 1),
             ])
         expect(grid.rows == 7 && grid.cols >= 53 && grid.cells.count == grid.cols * 7, "grid shape")
         expect(grid.cells.first?.date == "2025-12-28" && grid.cells.first?.inYear == false, "grid starts on the prior Sunday")

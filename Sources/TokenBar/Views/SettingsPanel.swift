@@ -179,7 +179,10 @@ struct SettingsPanel: View {
 
     /// Auto + every window the latest quota snapshot knows about.
     private var quotaSourceOptions: [(String, String)] {
-        var options = [(QuotaResolver.auto, "Auto (tightest window)")]
+        var options = [
+            (QuotaResolver.auto, "Auto (tightest window)"),
+            (QuotaResolver.lastUsed, "Following (last used agent)"),
+        ]
         for agent in agentUsage?.agents ?? [] where agent.error == nil {
             let name = ClientRegistry.style(agent.clientId).displayName
             for window in agent.windows {
