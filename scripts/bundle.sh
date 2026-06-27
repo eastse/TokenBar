@@ -76,9 +76,11 @@ cat > "$APP/Contents/Info.plist" <<PLIST
     <!-- raw main-branch URL: GitHub's releases/latest/download excludes
          prerelease-flagged releases, which would break the beta channel.
          The old TokenBar-Native path keeps redirecting here for existing
-         beta installs (the name is never reclaimed). -->
+         beta installs (the name is never reclaimed).
+         Temporarily disabled (local builds only).
     <key>SUFeedURL</key>
     <string>https://raw.githubusercontent.com/Nanako0129/TokenBar/main/appcast.xml</string>
+    -->
 </dict>
 </plist>
 PLIST
