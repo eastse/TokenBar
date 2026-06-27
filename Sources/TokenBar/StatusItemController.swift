@@ -2,63 +2,57 @@ import AppKit
 import SwiftUI
 import TokenBarCore
 
-/// Owns the NSStatusItem and its NSPopover (AppKit-hosted icon, SwiftUI
-/// popover content — the codexbar pattern). Later phases talk to it through
+/// Owns the NSStatusItem and its dropdown panel (AppKit-hosted icon, SwiftUI
+/// content — the codexbar pattern). Later phases talk to it through
 /// `updateTitle(_:)` and `showPopover()`.
 @MainActor
 final class StatusItemController: NSObject {
     private let statusItem: NSStatusItem
-    private let popover: NSPopover
-    /// Source of truth for the popover's (user-adjustable) height.
+    private let panel: DropdownPanelController
+    /// Source of truth for the panel's (user-adjustable) height.
     let chrome = PopoverChrome()
     private var defaultsObserver: NSObjectProtocol?
-    private var closeObserver: NSObjectProtocol?
     private var host: NSHostingController<AnyView>?
 
     override init() {
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
-        popover = NSPopover()
+        panel = DropdownPanelController()
         super.init()
 
-        popover.behavior = .transient
         let host = NSHostingController(rootView: AnyView(PopoverView().environmentObject(chrome)))
         self.host = host
-        // The SwiftUI root has a fixed frame; let the popover keep our size
+        // The SwiftUI root has a fixed frame; let the panel keep our size
         // instead of chasing intrinsic-size updates. The real size is set per
         // open in showPopover() against the status item's actual screen.
         host.sizingOptions = []
-        popover.contentSize = NSSize(width: chrome.width, height: chrome.minHeight)
-        popover.contentViewController = host
+        panel.contentSize = NSSize(width: chrome.width, height: chrome.minHeight)
+        panel.contentViewController = host
 
-        // Swap the live UI for a placeholder when the popover closes for any
-        // reason (transient outside-click, Esc, programmatic close) — mirrors
-        // the SettingsWindowController pattern. Without this, PopoverView's
+        // Swap the live UI for a placeholder when the panel closes for any
+        // reason (outside-click, Esc, programmatic close) — mirrors the
+        // SettingsWindowController pattern. Without this, PopoverView's
         // .task loops run for the process lifetime because the hosting
         // controller persists across transient open/close cycles.
-        closeObserver = NotificationCenter.default.addObserver(
-            forName: NSPopover.didCloseNotification, object: popover, queue: .main
-        ) { [weak self] _ in
-            MainActor.assumeIsolated {
-                guard let self else { return }
-                // didCloseNotification fires on a later runloop turn (after the
-                // ~200ms close animation), by which point a fast close→reopen
-                // may already have reinstalled the live view. Re-check on the
-                // next turn and only blank if the popover is still closed, so a
-                // reopen that landed meanwhile isn't swapped to the placeholder.
-                DispatchQueue.main.async { [weak self] in
-                    guard let self, !self.popover.isShown else { return }
-                    self.host?.rootView = AnyView(
-                        Color.clear.frame(width: self.chrome.width, height: self.chrome.minHeight))
-                }
+        panel.onClose = { [weak self] in
+            guard let self else { return }
+            // The close animation finishes asynchronously, by which point a
+            // fast close→reopen may already have reinstalled the live view.
+            // Re-check on the next runloop turn and only blank if the panel
+            // is still closed, so a reopen that landed meanwhile isn't
+            // swapped to the placeholder.
+            DispatchQueue.main.async { [weak self] in
+                guard let self, !self.panel.isShown else { return }
+                self.host?.rootView = AnyView(
+                    Color.clear.frame(width: self.chrome.width, height: self.chrome.minHeight))
             }
         }
 
-        // The chrome model drives the popover window from three inputs: the
+        // The chrome model drives the panel window from three inputs: the
         // bottom drag handle, the settings slider, and the screen-size resolve.
-        chrome.onResize = { [weak popover] height, live in
-            guard let popover else { return }
-            popover.animates = !live // 1:1 tracking mid-drag; animate otherwise
-            popover.contentSize = NSSize(width: PopoverChrome.width, height: height)
+        chrome.onResize = { [weak panel] height, live in
+            guard let panel else { return }
+            panel.animates = !live // 1:1 tracking mid-drag; animate otherwise
+            panel.contentSize = NSSize(width: PopoverChrome.width, height: height)
         }
         // The settings window's slider writes the height default from another
         // window — mirror it onto a live popover.
@@ -126,7 +120,7 @@ final class StatusItemController: NSObject {
     }
 
     func showPopover() {
-        guard !popover.isShown, let button = statusItem.button else { return }
+        guard !panel.isShown, let button = statusItem.button else { return }
         // Reinstall the live PopoverView so its .task loops start fresh
         // (the previous close swapped it for a static placeholder).
         host?.rootView = AnyView(PopoverView().environmentObject(chrome))
@@ -134,28 +128,26 @@ final class StatusItemController: NSObject {
         // unlike NSScreen.main at launch with no key window) every time we open.
         let visible = (button.window?.screen ?? NSScreen.main)?.visibleFrame.height ?? 900
         chrome.resolve(visibleHeight: visible)
-        // Accessory apps are never frontmost; activate so the transient
-        // popover gets key status and closes on outside clicks.
+        // Accessory apps are never frontmost; activate so the panel gets key
+        // status and closes on outside clicks.
         NSApp.activate(ignoringOtherApps: true)
-        popover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
+        panel.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
     }
 
     func closePopover() {
-        popover.performClose(nil)
+        panel.performClose(nil)
     }
 
     /// Clean teardown on app termination: drop the defaults observer, close
-    /// the popover, and remove the status item so ControlCenter tears the
+    /// the panel, and remove the status item so ControlCenter tears the
     /// menu-bar item down via a normal removal instead of an abrupt
     /// connection-invalidation — the latter left RunningBoard "waiting on
     /// exit context" for ~40s on quit (seen in the 2026-06-16 freeze logs).
     func tearDown() {
         if let defaultsObserver { NotificationCenter.default.removeObserver(defaultsObserver) }
         defaultsObserver = nil
-        if let closeObserver { NotificationCenter.default.removeObserver(closeObserver) }
-        closeObserver = nil
-        if popover.isShown { popover.performClose(nil) }
-        popover.contentViewController = nil
+        if panel.isShown { panel.performClose(nil) }
+        panel.contentViewController = nil
         NSStatusBar.system.removeStatusItem(statusItem)
     }
 
@@ -164,7 +156,7 @@ final class StatusItemController: NSObject {
             showQuotaMenu()
             return
         }
-        if popover.isShown {
+        if panel.isShown {
             closePopover()
         } else {
             showPopover()

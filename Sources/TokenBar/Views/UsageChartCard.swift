@@ -243,7 +243,7 @@ struct UsageChartCard: View {
             Text(Format.monthDay(bar.date))
                 .font(.caption.weight(.semibold))
             HStack {
-                Text("\(Format.exactTokens(bar.totalTokens)) tokens")
+                Text("\(Format.compactTokens(bar.totalTokens)) tokens")
                 Spacer()
                 Text(Format.usd(bar.totalCost))
             }

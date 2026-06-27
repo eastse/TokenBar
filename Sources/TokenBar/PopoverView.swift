@@ -60,6 +60,7 @@ struct PopoverView: View {
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .background(OverlayScrollerEnforcer())
             }
+            .scrollIndicators(.hidden)
             .clipped()
             Divider()
             footer
@@ -110,17 +111,17 @@ struct PopoverView: View {
 
     private var header: some View {
         HStack {
-            BrandMark()
-                .frame(width: 19, height: 19)
-            Text("TokenBar")
-                .font(.headline)
-            Spacer()
             liveRateBadge
+            Spacer()
             yearMenu
             refreshButton
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 12)
+        // Empty header areas drag the whole dropdown panel (interactive
+        // controls above keep responding because SwiftUI hit-tests them
+        // first). Matches the macOS Wi-Fi/Control Center title-bar grip.
+        .background(WindowDragHandle())
     }
 
     /// Year filter for every lens — the Tauri HeaderBar's year select. "All"

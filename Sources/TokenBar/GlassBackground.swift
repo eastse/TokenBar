@@ -52,3 +52,17 @@ struct VisualEffectBackground: NSViewRepresentable {
         view.material = material
     }
 }
+
+/// Drag the host window from the SwiftUI view it backs. Drop into
+/// `.background(WindowDragHandle())` on a region that should act as a
+/// title-bar grip — SwiftUI controls on top still hit-test first, so only
+/// the empty pixels between them trigger window drags.
+struct WindowDragHandle: NSViewRepresentable {
+    final class HandleView: NSView {
+        override func mouseDown(with event: NSEvent) {
+            window?.performDrag(with: event)
+        }
+    }
+    func makeNSView(context: Context) -> NSView { HandleView() }
+    func updateNSView(_ nsView: NSView, context: Context) {}
+}
