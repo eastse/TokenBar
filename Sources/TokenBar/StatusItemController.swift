@@ -13,6 +13,12 @@ final class StatusItemController: NSObject {
     let chrome = PopoverChrome()
     private var defaultsObserver: NSObjectProtocol?
     private var host: NSHostingController<AnyView>?
+    private var buttonAppearanceObserver: NSKeyValueObservation?
+
+    /// 菜单栏外观变化(系统 light/dark 偏好或全屏黑底)时触发。
+    /// 观察 button.effectiveAppearance 而不是 NSApp.effectiveAppearance —
+    /// 后者只随用户偏好变,前者还会在全屏菜单栏自动变深时切换 vibrant 系列。
+    var onAppearanceChanged: (() -> Void)?
 
     override init() {
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
@@ -73,6 +79,14 @@ final class StatusItemController: NSObject {
             button.action = #selector(togglePopover(_:))
             // Right-click opens the quota-source menu (battery-icon pattern).
             button.sendAction(on: [.leftMouseUp, .rightMouseUp])
+            // 全屏切换让菜单栏变黑底时,系统更新的是 button.effectiveAppearance
+            // (NSApp.effectiveAppearance 不会动),不监听这条会导致图标/文字
+            // 颜色滞后到下一次 quota poll 才刷新。
+            buttonAppearanceObserver = button.observe(
+                \.effectiveAppearance, options: [.new]
+            ) { [weak self] _, _ in
+                MainActor.assumeIsolated { self?.onAppearanceChanged?() }
+            }
         }
     }
 
@@ -127,9 +141,12 @@ final class StatusItemController: NSObject {
     /// lines fit inside the menu-bar's vertical budget.
     func updateMultilineTitle(_ lines: [(text: String, color: NSColor?)]) {
         guard let button = statusItem.button, !lines.isEmpty else { return }
+        // 把 dark/light 编进 cache key:line.color = nil 时实际着色由
+        // isDarkAppearance 决定,菜单栏明暗切换时必须重写 attributedTitle。
+        let dark = isDarkAppearance
         let key = lines
             .map { "\($0.text)|\($0.color?.description ?? "")" }
-            .joined(separator: ";")
+            .joined(separator: ";") + "|\(dark)"
         if key != lastMultilineKey {
             lastMultilineKey = key
             lastTitleKey = ""
@@ -137,13 +154,13 @@ final class StatusItemController: NSObject {
             let para = NSMutableParagraphStyle()
             para.alignment = .left
             para.lineBreakMode = .byClipping
-            para.maximumLineHeight = 9
-            para.minimumLineHeight = 9
+            para.maximumLineHeight = 10
+            para.minimumLineHeight = 10
             para.lineSpacing = 0
             // Fully monospaced (not just digits) so the label / space / digit
             // columns share the same X across both lines — same trick the
             // system battery uses to right-align "B 100" and "C  43".
-            let font = NSFont.monospacedSystemFont(ofSize: 9, weight: .regular)
+            let font = NSFont.monospacedSystemFont(ofSize: 10, weight: .medium)
 
             let attr = NSMutableAttributedString()
             for (i, line) in lines.enumerated() {
@@ -157,8 +174,13 @@ final class StatusItemController: NSObject {
                     // baseline offset on every run shifts the block down to
                     // sit visually centered next to the icon.
                     .baselineOffset: -4.0,
+                    // 无指定颜色时,显式选与单行 button.title 同款的菜单栏
+                    // 默认文字色:深色菜单栏白、浅色菜单栏黑。labelColor 在
+                    // NSStatusBarButton 的 attributedTitle 上下文里走的是
+                    // vibrant 路径,跟单行 plain title 的实际渲染不一致;
+                    // 直接按 effectiveAppearance 取静态色才能视觉对齐。
+                    .foregroundColor: line.color ?? (dark ? NSColor.white : NSColor.black),
                 ]
-                if let c = line.color { attrs[.foregroundColor] = c }
                 // Leading space mirrors updateTitle's icon→text gap.
                 attr.append(NSAttributedString(string: " " + line.text, attributes: attrs))
             }
@@ -194,6 +216,8 @@ final class StatusItemController: NSObject {
     func tearDown() {
         if let defaultsObserver { NotificationCenter.default.removeObserver(defaultsObserver) }
         defaultsObserver = nil
+        buttonAppearanceObserver?.invalidate()
+        buttonAppearanceObserver = nil
         if panel.isShown { panel.performClose(nil) }
         panel.contentViewController = nil
         NSStatusBar.system.removeStatusItem(statusItem)

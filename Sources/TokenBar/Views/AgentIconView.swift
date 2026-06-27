@@ -11,10 +11,10 @@ import TokenBarCore
 enum AgentIconImage {
     fileprivate static let monoIds: Set<String> = [
         "claude", "gemini", "opencode", "copilot", "cursor", "amp", "pi",
-        "kimi", "qwen", "warp",
+        "kimi", "qwen", "warp", "codex",
     ]
     fileprivate static let fullIds: Set<String> = [
-        "codex", "droid", "kilocode", "kilo", "synthetic", "codebuff",
+        "droid", "kilocode", "kilo", "synthetic", "codebuff",
         "antigravity", "kiro",
         // Official brand icons for the newer local clients (png/svg).
         "cline", "jcode", "micode", "gjc",
@@ -57,70 +57,95 @@ enum AgentIconImage {
     ) -> NSImage {
         let style = ClientRegistry.style(clientId)
         let iconId = Self.iconId(clientId)
-        let output = NSImage(size: NSSize(width: size, height: size), flipped: false) { rect in
-            if monochrome {
-                let ink: NSColor = dark ? .white : .black
-                if let source = sourceImage(iconId) {
-                    let mark = rect.insetBy(dx: size * 0.08, dy: size * 0.08)
-                    if fullIds.contains(iconId) {
-                        drawWhiteMarkMask(source, in: mark, color: ink, size: size)
-                    } else {
-                        source.draw(in: mark, from: .zero, operation: .sourceOver, fraction: 1)
-                        ink.setFill()
-                        mark.fill(using: .sourceIn)
-                    }
+        // 用 4× 像素位图作为 backing,而不是延迟绘制的 NSImage(size:drawingHandler:)。
+        // 后者放到 NSStatusItem.button.image 时,系统在某些情况下只以 1× 调用
+        // handler,再缩放显示,导致 codex 这种 6 瓣花蕊的细节图标在菜单栏里
+        // 糊成一团。立刻把高密度位图绘制好,逻辑 size 设回 18pt,
+        // NSImage 自然携带 retina 级别的细节。
+        let pxScale: CGFloat = 4
+        let pxSize = max(1, Int((size * pxScale).rounded(.up)))
+        guard let rep = NSBitmapImageRep(
+            bitmapDataPlanes: nil,
+            pixelsWide: pxSize,
+            pixelsHigh: pxSize,
+            bitsPerSample: 8,
+            samplesPerPixel: 4,
+            hasAlpha: true,
+            isPlanar: false,
+            colorSpaceName: .deviceRGB,
+            bytesPerRow: 0,
+            bitsPerPixel: 0)
+        else { return NSImage(size: NSSize(width: size, height: size)) }
+        rep.size = NSSize(width: size, height: size)
+
+        NSGraphicsContext.saveGraphicsState()
+        NSGraphicsContext.current = NSGraphicsContext(bitmapImageRep: rep)
+        NSGraphicsContext.current?.imageInterpolation = .high
+        let rect = NSRect(x: 0, y: 0, width: size, height: size)
+
+        if monochrome {
+            let ink: NSColor = dark ? .white : .black
+            if let source = sourceImage(iconId) {
+                let mark = rect.insetBy(dx: size * 0.08, dy: size * 0.08)
+                if fullIds.contains(iconId) {
+                    drawWhiteMarkMask(source, in: mark, color: ink, size: size)
                 } else {
-                    let text = String(style.displayName.prefix(1)).uppercased()
-                    let font = NSFont.systemFont(ofSize: size * 0.72, weight: .bold)
-                    let attrs: [NSAttributedString.Key: Any] = [
-                        .font: font,
-                        .foregroundColor: ink,
-                    ]
-                    let textSize = text.size(withAttributes: attrs)
-                    text.draw(
-                        at: NSPoint(
-                            x: rect.midX - textSize.width / 2,
-                            y: rect.midY - textSize.height / 2),
-                        withAttributes: attrs)
-                }
-                return true
-            }
-
-            if fullIds.contains(iconId), let source = sourceImage(iconId) {
-                NSGraphicsContext.current?.saveGraphicsState()
-                NSBezierPath(ovalIn: rect).addClip()
-                if lightBackedIds.contains(iconId) {
-                    NSColor.white.setFill()
-                    NSBezierPath(ovalIn: rect).fill()
-                }
-                source.draw(in: rect, from: .zero, operation: .sourceOver, fraction: 1)
-                NSGraphicsContext.current?.restoreGraphicsState()
-            } else {
-                NSColor(hex: style.color).setFill()
-                NSBezierPath(ovalIn: rect).fill()
-
-                if monoIds.contains(iconId), let source = sourceImage(iconId) {
-                    let mark = rect.insetBy(dx: size * 0.18, dy: size * 0.18)
                     source.draw(in: mark, from: .zero, operation: .sourceOver, fraction: 1)
-                    NSColor.white.setFill()
+                    ink.setFill()
                     mark.fill(using: .sourceIn)
-                } else {
-                    let text = String(style.displayName.prefix(1)).uppercased()
-                    let font = NSFont.systemFont(ofSize: size * 0.55, weight: .bold)
-                    let attrs: [NSAttributedString.Key: Any] = [
-                        .font: font,
-                        .foregroundColor: NSColor.white,
-                    ]
-                    let textSize = text.size(withAttributes: attrs)
-                    text.draw(
-                        at: NSPoint(
-                            x: rect.midX - textSize.width / 2,
-                            y: rect.midY - textSize.height / 2),
-                        withAttributes: attrs)
                 }
+            } else {
+                let text = String(style.displayName.prefix(1)).uppercased()
+                let font = NSFont.systemFont(ofSize: size * 0.72, weight: .bold)
+                let attrs: [NSAttributedString.Key: Any] = [
+                    .font: font,
+                    .foregroundColor: ink,
+                ]
+                let textSize = text.size(withAttributes: attrs)
+                text.draw(
+                    at: NSPoint(
+                        x: rect.midX - textSize.width / 2,
+                        y: rect.midY - textSize.height / 2),
+                    withAttributes: attrs)
             }
-            return true
+        } else if fullIds.contains(iconId), let source = sourceImage(iconId) {
+            NSGraphicsContext.current?.saveGraphicsState()
+            NSBezierPath(ovalIn: rect).addClip()
+            if lightBackedIds.contains(iconId) {
+                NSColor.white.setFill()
+                NSBezierPath(ovalIn: rect).fill()
+            }
+            source.draw(in: rect, from: .zero, operation: .sourceOver, fraction: 1)
+            NSGraphicsContext.current?.restoreGraphicsState()
+        } else {
+            NSColor(hex: style.color).setFill()
+            NSBezierPath(ovalIn: rect).fill()
+
+            if monoIds.contains(iconId), let source = sourceImage(iconId) {
+                let mark = rect.insetBy(dx: size * 0.18, dy: size * 0.18)
+                source.draw(in: mark, from: .zero, operation: .sourceOver, fraction: 1)
+                NSColor.white.setFill()
+                mark.fill(using: .sourceIn)
+            } else {
+                let text = String(style.displayName.prefix(1)).uppercased()
+                let font = NSFont.systemFont(ofSize: size * 0.55, weight: .bold)
+                let attrs: [NSAttributedString.Key: Any] = [
+                    .font: font,
+                    .foregroundColor: NSColor.white,
+                ]
+                let textSize = text.size(withAttributes: attrs)
+                text.draw(
+                    at: NSPoint(
+                        x: rect.midX - textSize.width / 2,
+                        y: rect.midY - textSize.height / 2),
+                    withAttributes: attrs)
+            }
         }
+
+        NSGraphicsContext.restoreGraphicsState()
+
+        let output = NSImage(size: NSSize(width: size, height: size))
+        output.addRepresentation(rep)
         output.isTemplate = false
         return output
     }
@@ -128,7 +153,10 @@ enum AgentIconImage {
     private static func drawWhiteMarkMask(
         _ source: NSImage, in rect: NSRect, color: NSColor, size: CGFloat
     ) {
-        let scale = max(2, Int(size.rounded(.up)))
+        // 以高于目标像素尺寸数倍的密度采样,使细节复杂的图标(如 codex
+        // 的 6 瓣花蕊)在 18pt 菜单栏尺寸下依然清晰。1× 采样下白色阈值
+        // 会把反走样边缘整片切掉,小图标看起来就是一团模糊。
+        let scale = max(72, Int((size * 4).rounded(.up)))
         let width = scale
         let height = scale
         guard let rep = NSBitmapImageRep(
@@ -146,6 +174,7 @@ enum AgentIconImage {
 
         NSGraphicsContext.saveGraphicsState()
         NSGraphicsContext.current = NSGraphicsContext(bitmapImageRep: rep)
+        NSGraphicsContext.current?.imageInterpolation = .high
         NSColor.clear.setFill()
         NSRect(x: 0, y: 0, width: width, height: height).fill()
         source.draw(
@@ -180,6 +209,7 @@ enum AgentIconImage {
         else { return }
 
         NSGraphicsContext.current?.saveGraphicsState()
+        NSGraphicsContext.current?.imageInterpolation = .high
         NSBezierPath(rect: rect).addClip()
         NSImage(cgImage: mask, size: rect.size)
             .draw(in: rect, from: .zero, operation: .sourceOver, fraction: 1)

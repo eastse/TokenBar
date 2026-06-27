@@ -57,7 +57,6 @@ final class TrayAnimator {
     }
 
     private var defaultsObserver: NSObjectProtocol?
-    private var appearanceObserver: NSKeyValueObservation?
     /// Snapshot of the icon-affecting defaults the observer reacts to. The
     /// global didChangeNotification carries no key and fires for every write
     /// (popover height, active tab, year, quota cache…), so we compare this
@@ -100,12 +99,12 @@ final class TrayAnimator {
                 self.startAnimationLoop()
             }
         }
-        // Re-render on dark/light mode flip so gauge icons don't show the
-        // wrong color scheme for up to 30s (the gauge loop's sleep interval).
-        appearanceObserver = NSApp.observe(
-            \.effectiveAppearance, options: [.new]
-        ) { [weak self] _, _ in
-            MainActor.assumeIsolated { self?.renderCurrentIcon() }
+        // 菜单栏外观切换(系统 light/dark、全屏黑底)时即时刷新图标和 title。
+        // 用 statusItem.button.effectiveAppearance 而不是 NSApp.effectiveAppearance:
+        // 后者只在用户偏好变化时动,前者还会在全屏菜单栏自动变深时切换 vibrant 系列。
+        controller?.onAppearanceChanged = { [weak self] in
+            self?.renderCurrentIcon()
+            self?.onQuotaUpdated?()
         }
     }
 
@@ -114,7 +113,7 @@ final class TrayAnimator {
         loadTask?.cancel()
         quotaTask?.cancel()
         if let defaultsObserver { NotificationCenter.default.removeObserver(defaultsObserver) }
-        appearanceObserver?.invalidate()
+        controller?.onAppearanceChanged = nil
     }
 
     /// Draws the current static icon immediately. Two-line quota mode always
