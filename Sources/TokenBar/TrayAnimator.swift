@@ -161,6 +161,23 @@ final class TrayAnimator {
         return cachedQuotaRemaining
     }
 
+    /// All windows (label + remaining%) of the agent the current quota
+    /// source resolves to, in their natural order (Session, Weekly, ...).
+    /// Used by the menu-bar's multi-line Quota-left title; empty when no
+    /// quota payload has arrived yet.
+    var quotaWindows: [(label: String, remaining: Double)] {
+        let selection = UserDefaults.standard.string(forKey: Self.quotaSourceKey)
+            ?? QuotaResolver.auto
+        guard let payload = quota,
+              let pick = QuotaResolver.resolve(
+                payload: payload, trace: trace, selection: selection),
+              let agent = payload.agents.first(where: { $0.clientId == pick.clientId })
+        else { return [] }
+        return agent.windows
+            .filter { $0.remainingPercent.isFinite }
+            .map { ($0.label, $0.remainingPercent) }
+    }
+
     /// Persist the last good remaining percent so a relaunch shows it
     /// immediately. Called at quota-arrival points, not from the getter.
     /// Reads `quotaRemaining` (not `cachedQuotaRemaining`) so it resolves the

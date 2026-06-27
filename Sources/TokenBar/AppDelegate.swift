@@ -102,6 +102,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let mode = TrayMode.current
         let quotaRemaining = trayAnimator?.quotaRemaining
         let rate = trayAnimator?.tokensPerMinRate ?? lastRate
+        if mode == .quotaLeft {
+            let windows = trayAnimator?.quotaWindows ?? []
+            if windows.count >= 2 {
+                statusController?.updateMultilineTitle(
+                    TrayMode.quotaLines(windows: windows))
+                return
+            }
+        }
         statusController?.updateTitle(
             mode.title(graph: lastGraph, tokensPerMin: rate, quotaRemaining: quotaRemaining),
             color: mode.titleColor(quotaRemaining: quotaRemaining))

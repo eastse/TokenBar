@@ -62,18 +62,37 @@ enum TrayMode: String, CaseIterable {
     /// text and the icon move together.
     func titleColor(quotaRemaining: Double?) -> NSColor? {
         guard self == .quotaLeft, let quotaRemaining else { return nil }
+        return Self.menuBarTint(remaining: quotaRemaining)
+    }
+
+    /// IconColoring-aware tint for menu-bar text: nil means no color (uses
+    /// the default label color). Shared by `titleColor` and `quotaLines`.
+    private static func menuBarTint(remaining: Double) -> NSColor? {
         let coloring = IconColoring(
             rawValue: UserDefaults.standard.string(forKey: IconColoring.storageKey) ?? ""
         ) ?? .warningOnly
         switch coloring {
-        case .never:
-            return nil
-        case .always:
-            return TrayIcons.gaugeColor(remaining: quotaRemaining)
+        case .never: return nil
+        case .always: return TrayIcons.gaugeColor(remaining: remaining)
         case .warningOnly:
-            return quotaRemaining <= 25
-                ? TrayIcons.gaugeColor(remaining: quotaRemaining)
-                : nil
+            return remaining <= 25 ? TrayIcons.gaugeColor(remaining: remaining) : nil
+        }
+    }
+
+    /// Compact Quota-left lines for the multi-line menu-bar title — first
+    /// letter of each window label (`S` for Session, `W` for Weekly) plus
+    /// the remaining percent, separated by a single space. Capped at two
+    /// lines. Padding to a fixed digit width would make label↔number gap
+    /// too wide visually; both lines share the same length 99% of the time.
+    static func quotaLines(
+        windows: [(label: String, remaining: Double)]
+    ) -> [(text: String, color: NSColor?)] {
+        windows.prefix(2).map { window in
+            let initial = window.label.first.map { String($0).uppercased() } ?? "?"
+            let pct = Int(min(100, max(0, window.remaining)).rounded())
+            // let text = "\(initial) \(pct)%"
+            let text = String(format: "%@%3d%%", initial, pct)
+            return (text, menuBarTint(remaining: window.remaining))
         }
     }
 }

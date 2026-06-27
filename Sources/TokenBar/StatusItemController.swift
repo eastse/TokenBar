@@ -95,6 +95,7 @@ final class StatusItemController: NSObject {
     }
 
     private var lastTitleKey = ""
+    private var lastMultilineKey = ""
 
     /// Sets the text shown next to the menu-bar icon ("" = icon only). A
     /// color (the quota gauge) renders as an attributed title.
@@ -103,8 +104,9 @@ final class StatusItemController: NSObject {
         // Leading space keeps a gap between the template icon and the text.
         let value = title.isEmpty ? "" : " \(title)"
         let key = "\(value)|\(color?.description ?? "")"
-        if key != lastTitleKey {
+        if key != lastTitleKey || !lastMultilineKey.isEmpty {
             lastTitleKey = key
+            lastMultilineKey = ""
             if let color, !value.isEmpty {
                 button.attributedTitle = NSAttributedString(
                     string: value,
@@ -117,6 +119,52 @@ final class StatusItemController: NSObject {
             }
         }
         button.imagePosition = value.isEmpty ? .imageOnly : .imageLeft
+    }
+
+    /// Two-line variant for Quota-left mode (e.g. Session on top, Weekly
+    /// below). Each line carries its own gauge tint per the IconColoring
+    /// preference and is drawn in a small monospaced-digit font so two
+    /// lines fit inside the menu-bar's vertical budget.
+    func updateMultilineTitle(_ lines: [(text: String, color: NSColor?)]) {
+        guard let button = statusItem.button, !lines.isEmpty else { return }
+        let key = lines
+            .map { "\($0.text)|\($0.color?.description ?? "")" }
+            .joined(separator: ";")
+        if key != lastMultilineKey {
+            lastMultilineKey = key
+            lastTitleKey = ""
+
+            let para = NSMutableParagraphStyle()
+            para.alignment = .left
+            para.lineBreakMode = .byClipping
+            para.maximumLineHeight = 9
+            para.minimumLineHeight = 9
+            para.lineSpacing = 0
+            // Fully monospaced (not just digits) so the label / space / digit
+            // columns share the same X across both lines — same trick the
+            // system battery uses to right-align "B 100" and "C  43".
+            let font = NSFont.monospacedSystemFont(ofSize: 9, weight: .regular)
+
+            let attr = NSMutableAttributedString()
+            for (i, line) in lines.enumerated() {
+                if i > 0 { attr.append(NSAttributedString(string: "\n")) }
+                var attrs: [NSAttributedString.Key: Any] = [
+                    .font: font,
+                    .paragraphStyle: para,
+                    // NSStatusBarButton aligns multi-line attributedTitle by
+                    // the first line's baseline against the image's vertical
+                    // centerline, which pushes both lines upward. A negative
+                    // baseline offset on every run shifts the block down to
+                    // sit visually centered next to the icon.
+                    .baselineOffset: -4.0,
+                ]
+                if let c = line.color { attrs[.foregroundColor] = c }
+                // Leading space mirrors updateTitle's icon→text gap.
+                attr.append(NSAttributedString(string: " " + line.text, attributes: attrs))
+            }
+            button.attributedTitle = attr
+        }
+        button.imagePosition = .imageLeft
     }
 
     func showPopover() {
