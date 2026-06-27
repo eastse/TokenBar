@@ -57,9 +57,23 @@ enum TrayMode: String, CaseIterable {
         }
     }
 
-    /// Gauge color for the quota title (nil = default label color).
+    /// Gauge color for the quota title (nil = default label color). Follows
+    /// the same IconColoring preference as the gauge icon so the menu-bar
+    /// text and the icon move together.
     func titleColor(quotaRemaining: Double?) -> NSColor? {
         guard self == .quotaLeft, let quotaRemaining else { return nil }
-        return TrayIcons.gaugeColor(remaining: quotaRemaining)
+        let coloring = IconColoring(
+            rawValue: UserDefaults.standard.string(forKey: IconColoring.storageKey) ?? ""
+        ) ?? .warningOnly
+        switch coloring {
+        case .never:
+            return nil
+        case .always:
+            return TrayIcons.gaugeColor(remaining: quotaRemaining)
+        case .warningOnly:
+            return quotaRemaining <= 25
+                ? TrayIcons.gaugeColor(remaining: quotaRemaining)
+                : nil
+        }
     }
 }
