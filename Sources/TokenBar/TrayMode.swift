@@ -85,18 +85,29 @@ enum TrayMode: String, CaseIterable {
 
     /// Compact Quota-left lines for the multi-line menu-bar title — first
     /// letter of each window label (`S` for Session, `W` for Weekly) plus
-    /// the remaining percent, separated by a single space. Capped at two
-    /// lines. Padding to a fixed digit width would make label↔number gap
-    /// too wide visually; both lines share the same length 99% of the time.
+    /// the remaining percent, separated by a single space. Always returns
+    /// exactly two lines: missing windows are rendered as `-` placeholders
+    /// (label letter retained when known) so the menu bar keeps its two-line
+    /// shape during loading / partial data instead of collapsing to one line.
     static func quotaLines(
         windows: [(label: String, remaining: Double)]
     ) -> [(text: String, color: NSColor?)] {
-        windows.prefix(2).map { window in
+        let pairs = windows.prefix(2)
+        var lines: [(text: String, color: NSColor?)] = pairs.map { window in
             let initial = window.label.first.map { String($0).uppercased() } ?? "?"
             let pct = Int(min(100, max(0, window.remaining)).rounded())
             let pctText = String(pct)
             let text = "\(initial)\(String(repeating: " ", count: max(0, 3 - pctText.count)))\(pctText)"
             return (text, menuBarTint(remaining: window.remaining))
         }
+        // Pad to two lines with placeholder `-` so the menu bar stays double
+        // height across loading / single-window agents. Default label letters
+        // mirror the standard Session/Weekly pairing.
+        let defaults = ["S", "W"]
+        while lines.count < 2 {
+            let letter = defaults[lines.count]
+            lines.append(("\(letter)  -", nil))
+        }
+        return lines
     }
 }

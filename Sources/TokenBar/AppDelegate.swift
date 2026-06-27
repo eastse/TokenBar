@@ -114,12 +114,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let quotaTitleRemaining = trayAnimator?.quotaTitleRemaining ?? quotaRemaining
         let rate = trayAnimator?.tokensPerMinRate ?? lastRate
         if mode == .quotaLeftTwoLines {
+            // 始终走双行,即使数据不足两个窗口 —— quotaLines 会用 `-` 占位,
+            // 保持菜单栏布局稳定,而不是退化成单行。
             let windows = trayAnimator?.quotaWindows ?? []
-            if windows.count >= 2 {
-                statusController?.updateMultilineTitle(
-                    TrayMode.quotaLines(windows: windows))
-                return
-            }
+            statusController?.updateMultilineTitle(
+                TrayMode.quotaLines(windows: windows))
+            return
         }
         statusController?.updateTitle(
             mode.title(graph: lastGraph, tokensPerMin: rate, quotaRemaining: quotaTitleRemaining),
