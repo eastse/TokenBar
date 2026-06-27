@@ -16,7 +16,7 @@ struct DashboardTabs: View {
         ScrollViewReader { proxy in
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 4) {
-                    tab(id: "overview", label: "Overview", color: nil, index: 1)
+                    tab(id: "overview", label: "All", color: nil, index: 1)
                     ForEach(Array(clients.enumerated()), id: \.element) { i, id in
                         let style = ClientRegistry.style(id)
                         tab(
@@ -40,7 +40,9 @@ struct DashboardTabs: View {
             active = id
         } label: {
             HStack(spacing: 5) {
-                if color != nil {
+                if id == "overview" {
+                    allIcon
+                } else if color != nil {
                     AgentIconView(clientId: id, size: 14)
                 }
                 Text(label)
@@ -66,5 +68,16 @@ struct DashboardTabs: View {
         }
         .buttonStyle(.plain)
         .id(id)
+    }
+
+    private var allIcon: some View {
+        ZStack {
+            Circle()
+                .fill(Color.secondary.opacity(0.75))
+            Image(systemName: "square.grid.2x2.fill")
+                .font(.system(size: 7.5, weight: .semibold))
+                .foregroundStyle(.white)
+        }
+        .frame(width: 14, height: 14)
     }
 }

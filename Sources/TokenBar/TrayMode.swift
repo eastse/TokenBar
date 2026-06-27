@@ -90,8 +90,8 @@ enum TrayMode: String, CaseIterable {
         windows.prefix(2).map { window in
             let initial = window.label.first.map { String($0).uppercased() } ?? "?"
             let pct = Int(min(100, max(0, window.remaining)).rounded())
-            // let text = "\(initial) \(pct)%"
-            let text = String(format: "%@%3d%", initial, pct)
+            let pctText = String(pct)
+            let text = "\(initial)\(String(repeating: " ", count: max(0, 3 - pctText.count)))\(pctText)"
             return (text, menuBarTint(remaining: window.remaining))
         }
     }

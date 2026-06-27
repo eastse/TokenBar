@@ -12,11 +12,27 @@ use serde_json::Value;
 
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
+struct HourlyClientEntry {
+    client: String,
+    input: i64,
+    output: i64,
+    cache_read: i64,
+    cache_write: i64,
+    reasoning: i64,
+    total: i64,
+    message_count: i32,
+    turn_count: i32,
+    cost: f64,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
 struct HourlyEntry {
     /// "YYYY-MM-DD HH:00" local-time slot.
     hour: String,
     clients: Vec<String>,
     models: Vec<String>,
+    client_breakdown: Vec<HourlyClientEntry>,
     input: i64,
     output: i64,
     cache_read: i64,
@@ -77,6 +93,22 @@ fn map_report(report: tokscale_core::HourlyReport) -> HourlyReportData {
                     hour: e.hour,
                     clients: e.clients,
                     models: e.models,
+                    client_breakdown: e
+                        .client_breakdown
+                        .into_iter()
+                        .map(|c| HourlyClientEntry {
+                            client: c.client,
+                            input: c.input,
+                            output: c.output,
+                            cache_read: c.cache_read,
+                            cache_write: c.cache_write,
+                            reasoning: c.reasoning,
+                            total: c.total,
+                            message_count: c.message_count,
+                            turn_count: c.turn_count,
+                            cost: c.cost,
+                        })
+                        .collect(),
                     input: e.input,
                     output: e.output,
                     cache_read: e.cache_read,

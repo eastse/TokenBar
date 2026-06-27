@@ -463,10 +463,26 @@ pub struct MonthlyReport {
 
 /// Hourly usage entry for a single hour slot (e.g. "2026-03-23 14:00")
 #[derive(Debug, Clone, serde::Serialize)]
+pub struct HourlyClientUsage {
+    pub client: String,
+    pub input: i64,
+    pub output: i64,
+    pub cache_read: i64,
+    pub cache_write: i64,
+    pub reasoning: i64,
+    pub total: i64,
+    pub message_count: i32,
+    /// Number of user interaction turns (user→assistant boundaries).
+    pub turn_count: i32,
+    pub cost: f64,
+}
+
+#[derive(Debug, Clone, serde::Serialize)]
 pub struct HourlyUsage {
     pub hour: String,
     pub clients: Vec<String>,
     pub models: Vec<String>,
+    pub client_breakdown: Vec<HourlyClientUsage>,
     pub input: i64,
     pub output: i64,
     pub cache_read: i64,
@@ -1929,9 +1945,22 @@ pub async fn get_agents_report(options: ReportOptions) -> Result<AgentReport, St
 }
 
 #[derive(Default)]
+struct HourClientAggregator {
+    input: i64,
+    output: i64,
+    cache_read: i64,
+    cache_write: i64,
+    reasoning: i64,
+    message_count: i32,
+    turn_count: i32,
+    cost: f64,
+}
+
+#[derive(Default)]
 struct HourAggregator {
     clients: HashSet<String>,
     models: HashSet<String>,
+    client_breakdown: HashMap<String, HourClientAggregator>,
     input: i64,
     output: i64,
     cache_read: i64,
@@ -1997,6 +2026,18 @@ pub async fn get_hourly_report(options: ReportOptions) -> Result<HourlyReport, S
                 entry.turn_count += 1;
             }
             entry.cost += msg.cost;
+
+            let client_entry = entry.client_breakdown.entry(msg.client.clone()).or_default();
+            client_entry.input += msg.tokens.input;
+            client_entry.output += msg.tokens.output;
+            client_entry.cache_read += msg.tokens.cache_read;
+            client_entry.cache_write += msg.tokens.cache_write;
+            client_entry.reasoning += msg.tokens.reasoning;
+            client_entry.message_count += msg.message_count.max(0);
+            if msg.is_turn_start {
+                client_entry.turn_count += 1;
+            }
+            client_entry.cost += msg.cost;
         },
     );
 
@@ -2012,6 +2053,30 @@ pub async fn get_hourly_report(options: ReportOptions) -> Result<HourlyReport, S
             models: {
                 let mut v: Vec<String> = agg.models.into_iter().collect();
                 v.sort();
+                v
+            },
+            client_breakdown: {
+                let mut v: Vec<HourlyClientUsage> = agg
+                    .client_breakdown
+                    .into_iter()
+                    .map(|(client, agg)| {
+                        let total =
+                            agg.input + agg.output + agg.cache_read + agg.cache_write + agg.reasoning;
+                        HourlyClientUsage {
+                            client,
+                            input: agg.input,
+                            output: agg.output,
+                            cache_read: agg.cache_read,
+                            cache_write: agg.cache_write,
+                            reasoning: agg.reasoning,
+                            total,
+                            message_count: agg.message_count,
+                            turn_count: agg.turn_count,
+                            cost: agg.cost,
+                        }
+                    })
+                    .collect();
+                v.sort_by(|a, b| a.client.cmp(&b.client));
                 v
             },
             input: agg.input,

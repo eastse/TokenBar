@@ -1,9 +1,8 @@
 import SwiftUI
 import TokenBarCore
 
-/// The classic TokenBar dashboard stack. The all-agent overview leads with
-/// the usage chart, lists every agent's limits and carries the live-session
-/// trace; a single-client tab leads with that client's limits instead.
+/// The classic TokenBar dashboard stack. All-agent and single-client views
+/// lead with quota/limit cards, then usage charts and breakdowns.
 struct OverviewView: View {
     let payload: UsagePayload
     /// The active tab's client slice (all present clients on Overview).
@@ -31,10 +30,10 @@ struct OverviewView: View {
                     report: modelReport, clientIds: clientIds, colors: colors,
                     title: "\(name) models")
             } else {
-                chart
                 AgentLimitsCard(
                     clients: clientIds, trace: trace, agentUsage: agentUsage,
                     reorderable: true)
+                chart
                 UsageTraceCard(buckets: trace, windowSecs: 600)
                 ModelBreakdownCard(
                     report: modelReport, clientIds: clientIds, colors: colors)

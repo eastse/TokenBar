@@ -10,8 +10,6 @@ import TokenBarCore
 struct HourlyView: View {
     let report: HourlyReport?
     /// Restrict slots to those involving any of these clients; empty = all.
-    /// Per-slot totals are not split by client, so filtered totals are coarse
-    /// — the view surfaces that caveat.
     var clientIds: [String] = []
     var filtered = false
 
@@ -33,30 +31,49 @@ struct HourlyView: View {
         var cost = 0.0
     }
 
-    private func allowed(_ e: HourlyReportEntry, _ allow: Set<String>) -> Bool {
-        allow.isEmpty || e.clients.contains { allow.contains($0) }
+    private var allowedClients: Set<String> { Set(clientIds) }
+
+    private func totals(_ e: HourlyReportEntry, in allow: Set<String>) -> (tokens: Int64, cost: Double) {
+        if allow.isEmpty {
+            return (e.total, e.cost)
+        }
+        if e.clientBreakdown.isEmpty {
+            return e.clients.contains { allow.contains($0) } ? (e.total, e.cost) : (0, 0)
+        }
+        var tokens: Int64 = 0
+        var cost = 0.0
+        for client in e.clientBreakdown where allow.contains(client.client) {
+            tokens += client.total
+            cost += client.cost
+        }
+        return (tokens, cost)
     }
 
     /// Profile: fold every slot into a 24-hour-of-day rhythm.
     private var buckets: [HourBucket] {
-        let allow = Set(clientIds)
+        let allow = allowedClients
         var out = (0..<24).map { HourBucket(hour: $0) }
-        for e in report?.entries ?? [] where allowed(e, allow) {
+        for e in report?.entries ?? [] {
+            let value = totals(e, in: allow)
+            guard value.tokens > 0 || value.cost > 0 else { continue }
             // "YYYY-MM-DD HH:00" → HH
             guard e.hour.count >= 13, let hh = Int(e.hour.dropFirst(11).prefix(2)),
                   (0...23).contains(hh)
             else { continue }
-            out[hh].tokens += e.total
-            out[hh].cost += e.cost
+            out[hh].tokens += value.tokens
+            out[hh].cost += value.cost
         }
         return out
     }
 
     /// Timeline: each slot on its own, newest first.
     private var timeline: [HourlyReportEntry] {
-        let allow = Set(clientIds)
+        let allow = allowedClients
         return (report?.entries ?? [])
-            .filter { allowed($0, allow) && ($0.total > 0 || $0.cost > 0) }
+            .filter {
+                let value = totals($0, in: allow)
+                return value.tokens > 0 || value.cost > 0
+            }
             .sorted { $0.hour > $1.hour }
     }
 
@@ -71,20 +88,16 @@ struct HourlyView: View {
     var body: some View {
         let buckets = self.buckets
         let timeline = self.timeline
+        let allow = allowedClients
         let hasData = mode == .profile
             ? buckets.contains { $0.tokens > 0 || $0.cost > 0 }
             : !timeline.isEmpty
 
         DashCard(
             mode == .profile ? "Hourly rhythm" : "Hourly usage",
-            subtitle: subtitle(buckets: buckets, timeline: timeline, hasData: hasData),
+            subtitle: subtitle(buckets: buckets, timeline: timeline, allow: allow, hasData: hasData),
             trailing: { modeToggle }
         ) {
-            if filtered && hasData {
-                Text("Filtered hours include each slot's full total across agents.")
-                    .font(.caption2)
-                    .foregroundStyle(.tertiary)
-            }
             if report == nil {
                 Text("Loading…")
                     .font(.caption)
@@ -105,14 +118,15 @@ struct HourlyView: View {
                 }
             } else {
                 let shown = Array(timeline.prefix(visible))
-                let maxTokens = max(timeline.map(\.total).max() ?? 1, 1)
+                let maxTokens = max(timeline.map { totals($0, in: allow).tokens }.max() ?? 1, 1)
                 let now = nowKey
                 LazyVStack(spacing: 3) {
                     ForEach(shown, id: \.hour) { e in
+                        let value = totals(e, in: allow)
                         hourRow(
                             // "YYYY-MM-DD HH:00" → "MM-DD HH:00"
                             label: String(e.hour.dropFirst(5)),
-                            tokens: e.total, cost: e.cost, maxTokens: maxTokens,
+                            tokens: value.tokens, cost: value.cost, maxTokens: maxTokens,
                             isCurrent: e.hour == now)
                     }
                 }
@@ -135,7 +149,9 @@ struct HourlyView: View {
         }
     }
 
-    private func subtitle(buckets: [HourBucket], timeline: [HourlyReportEntry], hasData: Bool)
+    private func subtitle(
+        buckets: [HourBucket], timeline: [HourlyReportEntry], allow: Set<String>, hasData: Bool
+    )
         -> String
     {
         guard hasData else { return "—" }
@@ -145,7 +161,7 @@ struct HourlyView: View {
             let cost = buckets.reduce(0) { $0 + $1.cost }
             return String(format: "peak %02d:00 · %@", peak.hour, Format.usd(cost))
         case .timeline:
-            let cost = timeline.reduce(0) { $0 + $1.cost }
+            let cost = timeline.reduce(0) { $0 + totals($1, in: allow).cost }
             return "\(timeline.count) hrs · \(Format.usd(cost))"
         }
     }
