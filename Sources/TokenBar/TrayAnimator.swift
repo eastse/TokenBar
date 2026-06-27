@@ -73,6 +73,7 @@ final class TrayAnimator {
             d.object(forKey: animateKey).map { "\($0)" } ?? "",
             d.string(forKey: quotaSourceKey) ?? "",
             d.string(forKey: IconColoring.storageKey) ?? "",
+            d.string(forKey: TrayMode.storageKey) ?? "",
         ].joined(separator: "|")
     }
 
@@ -94,7 +95,7 @@ final class TrayAnimator {
                 let next = Self.currentIconSignature()
                 guard next != self.iconSettingsSignature else { return }
                 self.iconSettingsSignature = next
-                self.renderGaugeIcon()
+                self.renderCurrentIcon()
                 self.animationTask?.cancel()
                 self.startAnimationLoop()
             }
@@ -104,7 +105,7 @@ final class TrayAnimator {
         appearanceObserver = NSApp.observe(
             \.effectiveAppearance, options: [.new]
         ) { [weak self] _, _ in
-            MainActor.assumeIsolated { self?.renderGaugeIcon() }
+            MainActor.assumeIsolated { self?.renderCurrentIcon() }
         }
     }
 
@@ -116,9 +117,14 @@ final class TrayAnimator {
         appearanceObserver?.invalidate()
     }
 
-    /// Draws the current gauge style immediately (no-op for cat/parrot,
-    /// whose frames the animation loop owns).
-    private func renderGaugeIcon() {
+    /// Draws the current static icon immediately. Two-line quota mode always
+    /// uses the resolved agent logo; gauge styles use the quota icon; cat/
+    /// parrot remain owned by the animation loop.
+    private func renderCurrentIcon() {
+        if let logo = twoLineAgentLogo() {
+            controller?.setFrame(logo)
+            return
+        }
         let style = UserDefaults.standard.string(forKey: Self.styleKey) ?? "cat"
         guard let gaugeStyle = QuotaIconStyle(rawValue: style) else { return }
         let coloring = IconColoring(
@@ -129,6 +135,17 @@ final class TrayAnimator {
                 style: gaugeStyle, remaining: quotaRemaining,
                 dark: controller?.isDarkAppearance ?? true,
                 coloring: coloring))
+    }
+
+    private func twoLineAgentLogo() -> NSImage? {
+        guard TrayMode.current == .quotaLeftTwoLines,
+              let id = currentAgentId
+        else { return nil }
+        return AgentIconImage.image(
+            clientId: id,
+            size: 18,
+            monochrome: true,
+            dark: controller?.isDarkAppearance ?? true)
     }
 
     /// Internal so the settings window's preview can fall back to the same
@@ -150,8 +167,8 @@ final class TrayAnimator {
     /// didChangeNotification and re-entered the observers. `persistRemaining()`
     /// is called explicitly when fresh quota data arrives instead.
     var quotaRemaining: Double? {
-        let selection = UserDefaults.standard.string(forKey: Self.quotaSourceKey)
-            ?? QuotaResolver.auto
+        let selection = QuotaResolver.normalizeSelection(
+            UserDefaults.standard.string(forKey: Self.quotaSourceKey))
         if let value = QuotaResolver.resolve(payload: quota, trace: trace, selection: selection)?
             .window.remainingPercent
         {
@@ -161,21 +178,53 @@ final class TrayAnimator {
         return cachedQuotaRemaining
     }
 
+    /// The quota percent used by the text title. In "Following" single-line
+    /// mode the icon still tracks the tightest window for warning pressure,
+    /// while the text answers the immediate Session question.
+    var quotaTitleRemaining: Double? {
+        let selection = QuotaResolver.normalizeSelection(
+            UserDefaults.standard.string(forKey: Self.quotaSourceKey))
+        if selection == QuotaResolver.lastUsed,
+           let session = currentAgent?.windows.first(where: {
+                $0.label.localizedCaseInsensitiveCompare("Session") == .orderedSame
+                    && $0.remainingPercent.isFinite
+           })
+        {
+            return session.remainingPercent
+        }
+        return quotaRemaining
+    }
+
     /// All windows (label + remaining%) of the agent the current quota
     /// source resolves to, in their natural order (Session, Weekly, ...).
     /// Used by the menu-bar's multi-line Quota-left title; empty when no
     /// quota payload has arrived yet.
     var quotaWindows: [(label: String, remaining: Double)] {
-        let selection = UserDefaults.standard.string(forKey: Self.quotaSourceKey)
-            ?? QuotaResolver.auto
+        let selection = QuotaResolver.normalizeSelection(
+            UserDefaults.standard.string(forKey: Self.quotaSourceKey))
         guard let payload = quota,
-              let pick = QuotaResolver.resolve(
-                payload: payload, trace: trace, selection: selection),
-              let agent = payload.agents.first(where: { $0.clientId == pick.clientId })
+              let agent = QuotaResolver.resolveAgent(
+                payload: payload, trace: trace, selection: selection)
         else { return [] }
         return agent.windows
             .filter { $0.remainingPercent.isFinite }
             .map { ($0.label, $0.remainingPercent) }
+    }
+
+    private var currentAgent: AgentUsageSnapshot? {
+        let selection = QuotaResolver.normalizeSelection(
+            UserDefaults.standard.string(forKey: Self.quotaSourceKey))
+        return QuotaResolver.resolveAgent(payload: quota, trace: trace, selection: selection)
+    }
+
+    private var currentAgentId: String? {
+        if let id = currentAgent?.clientId { return id }
+        let selection = QuotaResolver.normalizeSelection(
+            UserDefaults.standard.string(forKey: Self.quotaSourceKey))
+        guard selection != QuotaResolver.lowest, selection != QuotaResolver.lastUsed else {
+            return nil
+        }
+        return selection.split(separator: "|", maxSplits: 1).first.map(String.init)
     }
 
     /// Persist the last good remaining percent so a relaunch shows it
@@ -219,7 +268,12 @@ final class TrayAnimator {
                 // observer). This loop only catches appearance flips (light/
                 // dark mode), so a long sleep is fine.
                 if QuotaIconStyle(rawValue: style) != nil {
-                    self.renderGaugeIcon()
+                    self.renderCurrentIcon()
+                    try? await Task.sleep(for: .seconds(30))
+                    continue
+                }
+                if let logo = self.twoLineAgentLogo() {
+                    self.controller?.setFrame(logo)
                     try? await Task.sleep(for: .seconds(30))
                     continue
                 }
@@ -257,7 +311,7 @@ final class TrayAnimator {
                 guard let self, !Task.isCancelled else { break }
                 if let payload {
                     self.quota = payload
-                    self.renderGaugeIcon() // refreshes cachedQuotaRemaining
+                    self.renderCurrentIcon() // refreshes cachedQuotaRemaining
                     self.persistRemaining()
                     self.onQuotaUpdated?()
                 }
@@ -284,6 +338,7 @@ final class TrayAnimator {
                     self.load = min(rate / 10_000.0, 100.0)
                     self.tokensPerMinRate = rate
                     self.trace = trace
+                    self.renderCurrentIcon()
                     self.onQuotaUpdated?()
                 }
                 try? await Task.sleep(for: .seconds(30))

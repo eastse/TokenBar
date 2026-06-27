@@ -29,9 +29,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         max(1, UserDefaults.standard.object(forKey: intervalKey).flatMap { $0 as? Int } ?? 30)
     }
 
+    private static func migrateQuotaSourceValueIfNeeded() {
+        let defaults = UserDefaults.standard
+        let current = defaults.string(forKey: TrayAnimator.quotaSourceKey)
+        let normalized = QuotaResolver.normalizeSelection(current)
+        if current != normalized {
+            defaults.set(normalized, forKey: TrayAnimator.quotaSourceKey)
+        }
+    }
+
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(.accessory)
         BetaMigration.runIfNeeded() // before anything reads defaults
+        Self.migrateQuotaSourceValueIfNeeded()
         // refreshIntervalMin's initializer ran at AppDelegate construction in
         // main.swift, BEFORE the migration above — re-read it now so a migrated
         // (non-default) data-refresh interval is honored this session instead of
@@ -101,8 +111,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private func applyTitle() {
         let mode = TrayMode.current
         let quotaRemaining = trayAnimator?.quotaRemaining
+        let quotaTitleRemaining = trayAnimator?.quotaTitleRemaining ?? quotaRemaining
         let rate = trayAnimator?.tokensPerMinRate ?? lastRate
-        if mode == .quotaLeft {
+        if mode == .quotaLeftTwoLines {
             let windows = trayAnimator?.quotaWindows ?? []
             if windows.count >= 2 {
                 statusController?.updateMultilineTitle(
@@ -111,8 +122,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             }
         }
         statusController?.updateTitle(
-            mode.title(graph: lastGraph, tokensPerMin: rate, quotaRemaining: quotaRemaining),
-            color: mode.titleColor(quotaRemaining: quotaRemaining))
+            mode.title(graph: lastGraph, tokensPerMin: rate, quotaRemaining: quotaTitleRemaining),
+            color: mode.titleColor(quotaRemaining: quotaTitleRemaining))
     }
 
     /// Background graph refresh: serves the graph-based title modes (today's

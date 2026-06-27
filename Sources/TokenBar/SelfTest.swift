@@ -141,7 +141,7 @@ enum SelfTest {
             TraceBucket.collapseByClient([bucket("amp", "Main", "unknown", 5)]).first?.model == "unknown",
             "collapse keeps a lone unknown model")
 
-        // Quota resolver: auto picks the tightest window across agents,
+        // Quota resolver: lowest picks the tightest window across agents,
         // erroring agents are skipped, explicit selections parse. The payload
         // builds via JSON (the snapshot types have no memberwise inits).
         let quotaJSON = """
@@ -159,18 +159,22 @@ enum SelfTest {
         """
         let quotaPayload = try! JSONDecoder().decode(
             AgentUsagePayload.self, from: Data(quotaJSON.utf8))
-        let tightest = QuotaResolver.resolve(payload: quotaPayload, selection: "auto")
+        let tightest = QuotaResolver.resolve(payload: quotaPayload, selection: QuotaResolver.lowest)
         expect(
             tightest?.clientId == "claude" && tightest?.window.label == "Session",
-            "auto resolves the tightest healthy window")
+            "lowest resolves the tightest healthy window")
         expect(
             QuotaResolver.resolve(payload: quotaPayload, selection: "codex|Weekly")?
                 .window.remainingPercent == 35,
             "explicit quota selection resolves")
         expect(
+            QuotaResolver.resolve(payload: quotaPayload, selection: QuotaResolver.agentSelection(clientId: "codex"))?
+                .window.label == "Weekly",
+            "agent quota selection resolves the tightest window within that agent")
+        expect(
             QuotaResolver.resolve(payload: quotaPayload, selection: "nope|Session") == nil,
             "unknown quota selection is nil")
-        expect(QuotaResolver.resolve(payload: nil, selection: "auto") == nil, "no payload, no quota")
+        expect(QuotaResolver.resolve(payload: nil, selection: QuotaResolver.lowest) == nil, "no payload, no quota")
 
         // Limits-card drag reorder: direction-aware insert (down → after the
         // target, up → before it) so single-step moves both work.

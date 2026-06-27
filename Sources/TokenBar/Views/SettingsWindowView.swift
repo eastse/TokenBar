@@ -113,13 +113,15 @@ private struct MenuBarMock: View {
     @AppStorage(TrayAnimator.styleKey) private var animationStyle = "cat"
     @AppStorage(TrayAnimator.animateKey) private var animateTray = true
     @AppStorage(IconColoring.storageKey) private var iconColoringRaw = IconColoring.warningOnly.rawValue
-    @AppStorage(TrayAnimator.quotaSourceKey) private var quotaSource = QuotaResolver.auto
+    @AppStorage(TrayAnimator.quotaSourceKey) private var quotaSource = QuotaResolver.lowest
 
     var body: some View {
         let mode = TrayMode(rawValue: trayModeRaw) ?? .todayTokens
         let remaining = quotaRemaining
+        let titleRemaining = quotaTitleRemaining ?? remaining
+        let quotaLines = mode == .quotaLeftTwoLines ? TrayMode.quotaLines(windows: quotaWindows) : []
         let title = mode.title(
-            graph: graph, tokensPerMin: tokensPerMin, quotaRemaining: remaining)
+            graph: graph, tokensPerMin: tokensPerMin, quotaRemaining: titleRemaining)
         let ink: Color = dark ? .white : .black
 
         HStack(spacing: 10) {
@@ -128,13 +130,25 @@ private struct MenuBarMock: View {
                 .foregroundStyle(ink.opacity(0.4))
             Spacer()
             // The TokenBar status item, hover-highlighted to stand out.
-            HStack(spacing: title.isEmpty ? 0 : 4) {
-                icon(remaining: remaining)
-                if !title.isEmpty {
+            HStack(spacing: title.isEmpty && quotaLines.isEmpty ? 0 : 4) {
+                icon(
+                    remaining: remaining,
+                    agentLogoId: mode == .quotaLeftTwoLines ? quotaAgentId : nil)
+                if !quotaLines.isEmpty {
+                    VStack(alignment: .leading, spacing: 0) {
+                        ForEach(Array(quotaLines.enumerated()), id: \.offset) { _, line in
+                            Text(line.text)
+                                .font(.system(size: 9).monospaced())
+                                .frame(height: 9)
+                                .foregroundStyle(
+                                    line.color.map(Color.init(nsColor:)) ?? ink)
+                        }
+                    }
+                } else if !title.isEmpty {
                     Text(title)
                         .font(.system(size: 12).monospacedDigit())
                         .foregroundStyle(
-                            mode.titleColor(quotaRemaining: remaining)
+                            mode.titleColor(quotaRemaining: titleRemaining)
                                 .map(Color.init(nsColor:)) ?? ink)
                 }
             }
@@ -168,9 +182,43 @@ private struct MenuBarMock: View {
             ?? UserDefaults.standard.object(forKey: TrayAnimator.lastRemainingKey) as? Double
     }
 
+    private var quotaTitleRemaining: Double? {
+        if quotaSource == QuotaResolver.lastUsed,
+           let session = quotaAgent?.windows.first(where: {
+                $0.label.localizedCaseInsensitiveCompare("Session") == .orderedSame
+                    && $0.remainingPercent.isFinite
+           })
+        {
+            return session.remainingPercent
+        }
+        return quotaRemaining
+    }
+
+    /// Mirrors TrayAnimator.quotaWindows for the settings preview.
+    private var quotaWindows: [(label: String, remaining: Double)] {
+        guard let agent = quotaAgent else { return [] }
+        return agent.windows
+            .filter { $0.remainingPercent.isFinite }
+            .map { ($0.label, $0.remainingPercent) }
+    }
+
+    private var quotaAgent: AgentUsageSnapshot? {
+        QuotaResolver.resolveAgent(payload: agentUsage, trace: trace, selection: quotaSource)
+    }
+
+    private var quotaAgentId: String? {
+        quotaAgent?.clientId
+    }
+
     @ViewBuilder
-    private func icon(remaining: Double?) -> some View {
-        if let gauge = QuotaIconStyle(rawValue: animationStyle) {
+    private func icon(remaining: Double?, agentLogoId: String?) -> some View {
+        if let agentLogoId {
+            Image(nsImage: AgentIconImage.image(
+                clientId: agentLogoId,
+                size: 18,
+                monochrome: true,
+                dark: dark))
+        } else if let gauge = QuotaIconStyle(rawValue: animationStyle) {
             let coloring = IconColoring(rawValue: iconColoringRaw) ?? .warningOnly
             Image(nsImage: TrayIcons.image(
                 style: gauge, remaining: remaining, dark: dark, coloring: coloring))

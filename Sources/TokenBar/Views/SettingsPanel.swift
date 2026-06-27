@@ -13,7 +13,7 @@ struct SettingsPanel: View {
     @AppStorage(TrayAnimator.animateKey) private var animateTray = true
     @AppStorage(TrayAnimator.styleKey) private var animationStyle = "cat"
     @AppStorage(IconColoring.storageKey) private var iconColoringRaw = IconColoring.warningOnly.rawValue
-    @AppStorage(TrayAnimator.quotaSourceKey) private var quotaSource = QuotaResolver.auto
+    @AppStorage(TrayAnimator.quotaSourceKey) private var quotaSource = QuotaResolver.lowest
     @AppStorage("tokenbar.updates.beta") private var betaUpdates = false
     /// Mirrors SMAppService's actual state (read once per panel appearance).
     @State private var autostartEnabled = AutostartService.isAvailable && AutostartService.isEnabled
@@ -177,14 +177,17 @@ struct SettingsPanel: View {
         Double(max(700, (NSScreen.main?.visibleFrame.height ?? 1000) - 24))
     }
 
-    /// Auto + every window the latest quota snapshot knows about.
+    /// Lowest + every window the latest quota snapshot knows about.
     private var quotaSourceOptions: [(String, String)] {
         var options = [
-            (QuotaResolver.auto, "Auto (tightest window)"),
+            (QuotaResolver.lowest, "Lowest (quota left)"),
             (QuotaResolver.lastUsed, "Following (last used agent)"),
         ]
         for agent in agentUsage?.agents ?? [] where agent.error == nil {
             let name = ClientRegistry.style(agent.clientId).displayName
+            if agent.windows.contains(where: { $0.remainingPercent.isFinite }) {
+                options.append((QuotaResolver.agentSelection(clientId: agent.clientId), "\(name) · All windows"))
+            }
             for window in agent.windows {
                 options.append(
                     (QuotaResolver.selection(clientId: agent.clientId, label: window.label),

@@ -219,8 +219,9 @@ final class StatusItemController: NSObject {
     /// couple of seconds.
     private func showQuotaMenu() {
         let menu = NSMenu()
-        let current = UserDefaults.standard.string(forKey: TrayAnimator.quotaSourceKey)
-            ?? QuotaResolver.auto
+        let current = QuotaResolver.normalizeSelection(
+            UserDefaults.standard.string(forKey: TrayAnimator.quotaSourceKey))
+        let currentMode = TrayMode.current
 
         let header = NSMenuItem(title: "Menu bar tracks", action: nil, keyEquivalent: "")
         header.isEnabled = false
@@ -231,10 +232,10 @@ final class StatusItemController: NSObject {
                 title: title, action: #selector(pickQuotaSource(_:)), keyEquivalent: "")
             item.target = self
             item.representedObject = selection
-            item.state = selection == current ? .on : .off
+            item.state = selection == current && currentMode != .quotaLeftTwoLines ? .on : .off
             menu.addItem(item)
         }
-        add("Auto (tightest window)", selection: QuotaResolver.auto)
+        add("Lowest (quota left)", selection: QuotaResolver.lowest)
         add("Following (last used agent)", selection: QuotaResolver.lastUsed)
 
         if let payload = quotaPayloadProvider?() {
@@ -245,6 +246,16 @@ final class StatusItemController: NSObject {
                     action: nil, keyEquivalent: "")
                 name.isEnabled = false
                 menu.addItem(name)
+                let twoLineSelection = QuotaResolver.agentSelection(clientId: agent.clientId)
+                let twoLine = NSMenuItem(
+                    title: "Two-line mode",
+                    action: #selector(pickTwoLineQuotaSource(_:)),
+                    keyEquivalent: "")
+                twoLine.target = self
+                twoLine.representedObject = twoLineSelection
+                twoLine.state =
+                    currentMode == .quotaLeftTwoLines && current == twoLineSelection ? .on : .off
+                menu.addItem(twoLine)
                 for window in agent.windows {
                     let left = "\(Int(min(100, max(0, window.remainingPercent)).rounded()))% left"
                     add(
@@ -269,5 +280,12 @@ final class StatusItemController: NSObject {
     @objc private func pickQuotaSource(_ sender: NSMenuItem) {
         guard let selection = sender.representedObject as? String else { return }
         UserDefaults.standard.set(selection, forKey: TrayAnimator.quotaSourceKey)
+        UserDefaults.standard.set(TrayMode.quotaLeft.rawValue, forKey: TrayMode.storageKey)
+    }
+
+    @objc private func pickTwoLineQuotaSource(_ sender: NSMenuItem) {
+        guard let selection = sender.representedObject as? String else { return }
+        UserDefaults.standard.set(selection, forKey: TrayAnimator.quotaSourceKey)
+        UserDefaults.standard.set(TrayMode.quotaLeftTwoLines.rawValue, forKey: TrayMode.storageKey)
     }
 }

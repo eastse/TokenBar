@@ -11,6 +11,7 @@ enum TrayMode: String, CaseIterable {
     case totalCost = "total_cost"
     case tokensPerMin = "tokens_per_min"
     case quotaLeft = "quota_left"
+    case quotaLeftTwoLines = "quota_left_two_lines"
     case hidden
 
     static let storageKey = "tokenbar.tray.mode"
@@ -27,7 +28,8 @@ enum TrayMode: String, CaseIterable {
         case .totalTokens: return "Total tokens (1.5B)"
         case .totalCost: return "Total cost ($889)"
         case .tokensPerMin: return "Tokens / min (12.4K/m)"
-        case .quotaLeft: return "Quota left (57%)"
+        case .quotaLeft: return "Quota left, single line (57%)"
+        case .quotaLeftTwoLines: return "Quota left, two lines (S 57 / W 89)"
         case .hidden: return "Icon only"
         }
     }
@@ -35,7 +37,7 @@ enum TrayMode: String, CaseIterable {
     /// The tray title for this mode ("" = icon only). `tokensPerMin` feeds
     /// the live-rate mode; `quotaRemaining` the quota mode.
     func title(graph: UsagePayload?, tokensPerMin: Double?, quotaRemaining: Double? = nil) -> String {
-        if self == .quotaLeft {
+        if self == .quotaLeft || self == .quotaLeftTwoLines {
             guard let quotaRemaining else { return "—%" }
             return "\(Int(min(100, max(0, quotaRemaining)).rounded()))%"
         }
@@ -52,7 +54,7 @@ enum TrayMode: String, CaseIterable {
         case .tokensPerMin:
             guard let tokensPerMin else { return "—/m" }
             return "\(Format.compactTokens(Int64(max(0, tokensPerMin).rounded())))/m"
-        case .quotaLeft, .hidden:
+        case .quotaLeft, .quotaLeftTwoLines, .hidden:
             return ""
         }
     }
@@ -61,7 +63,9 @@ enum TrayMode: String, CaseIterable {
     /// the same IconColoring preference as the gauge icon so the menu-bar
     /// text and the icon move together.
     func titleColor(quotaRemaining: Double?) -> NSColor? {
-        guard self == .quotaLeft, let quotaRemaining else { return nil }
+        guard (self == .quotaLeft || self == .quotaLeftTwoLines), let quotaRemaining else {
+            return nil
+        }
         return Self.menuBarTint(remaining: quotaRemaining)
     }
 
