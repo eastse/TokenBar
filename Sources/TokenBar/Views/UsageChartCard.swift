@@ -2,8 +2,7 @@ import SwiftUI
 import TokenBarCore
 
 /// The "Token Usage" card, port of UsageBarGraph2D.tsx: trailing-30-day
-/// stacked bars (Model/Agent stacking, Tokens/Price metric, wrapping legend,
-/// rich hover tooltip).
+/// stacked token bars (Model/Agent stacking, wrapping legend, rich hover tooltip).
 struct UsageChartCard: View {
     let payload: UsagePayload
     /// Clients included in the stack (the active tab's slice).
@@ -12,7 +11,6 @@ struct UsageChartCard: View {
     let colors: ModelColorMap
 
     @AppStorage("tokenbar.chart.stackBy") private var stackByRaw = StackBy.model.rawValue
-    @AppStorage("tokenbar.chart.metric") private var metricRaw = ChartMetric.tokens.rawValue
     @State private var hoverIndex: Int?
     @State private var hoverY: CGFloat = 0
     @State private var tooltipSize: CGSize = .zero
@@ -22,7 +20,6 @@ struct UsageChartCard: View {
     private static let gap: CGFloat = 3
 
     private var stackBy: StackBy { StackBy(rawValue: stackByRaw) ?? .model }
-    private var metric: ChartMetric { ChartMetric(rawValue: metricRaw) ?? .tokens }
 
     private var bars: [DayBar] {
         DayBars.build(
@@ -32,7 +29,7 @@ struct UsageChartCard: View {
 
     var body: some View {
         let bars = self.bars
-        let legend = DayBars.legend(bars: bars, metric: metric)
+        let legend = DayBars.legend(bars: bars)
         DashCard(
             "Token Usage",
             subtitle: stackBy == .model ? "Stacked by model" : "Stacked by agent",
@@ -52,14 +49,9 @@ struct UsageChartCard: View {
     // MARK: - Header toggles
 
     private var toggles: some View {
-        HStack(spacing: 4) {
-            picker(selection: $stackByRaw, options: [
-                (StackBy.model.rawValue, "Model"), (StackBy.agent.rawValue, "Agent"),
-            ])
-            picker(selection: $metricRaw, options: [
-                (ChartMetric.tokens.rawValue, "Tokens"), (ChartMetric.cost.rawValue, "Price"),
-            ])
-        }
+        picker(selection: $stackByRaw, options: [
+            (StackBy.model.rawValue, "Model"), (StackBy.agent.rawValue, "Agent"),
+        ])
     }
 
     /// Compact two-option toggle, tighter than the native segmented picker.
@@ -117,7 +109,7 @@ struct UsageChartCard: View {
         GeometryReader { geo in
             let width = geo.size.width
             let barWidth = (width - Self.gap * CGFloat(bars.count - 1)) / CGFloat(bars.count)
-            let maxValue = max(bars.map(barTotal).max() ?? 1, metric == .cost ? 0.000001 : 1)
+            let maxValue = max(bars.map(\.totalTokens).max() ?? 1, 1)
 
             ZStack(alignment: .topLeading) {
                 canvas(bars: bars, barWidth: barWidth, maxValue: maxValue)
@@ -148,7 +140,7 @@ struct UsageChartCard: View {
         .frame(height: Self.chartHeight)
     }
 
-    private func canvas(bars: [DayBar], barWidth: CGFloat, maxValue: Double) -> some View {
+    private func canvas(bars: [DayBar], barWidth: CGFloat, maxValue: Int64) -> some View {
         Canvas { context, size in
             let bottom = size.height - 1
             // Axis line.
@@ -158,7 +150,7 @@ struct UsageChartCard: View {
 
             for (index, bar) in bars.enumerated() {
                 let x = CGFloat(index) * (barWidth + Self.gap)
-                let total = barTotal(bar)
+                let total = bar.totalTokens
                 if total <= 0 {
                     context.fill(
                         Path(roundedRect: CGRect(x: x, y: bottom - 2, width: barWidth, height: 2),
@@ -166,10 +158,10 @@ struct UsageChartCard: View {
                         with: .color(.secondary.opacity(0.15)))
                     continue
                 }
-                let totalHeight = CGFloat(total / maxValue) * (size.height - 8)
+                let totalHeight = CGFloat(total) / CGFloat(maxValue) * (size.height - 8)
                 var y = bottom
                 for segment in bar.segments {
-                    let h = totalHeight * CGFloat(segValue(segment) / total)
+                    let h = totalHeight * CGFloat(segment.tokens) / CGFloat(total)
                     guard h > 0 else { continue }
                     y -= h
                     context.fill(
@@ -185,14 +177,6 @@ struct UsageChartCard: View {
         Text(date.map(Format.monthDay) ?? "")
             .font(.caption2)
             .foregroundStyle(.tertiary)
-    }
-
-    private func barTotal(_ bar: DayBar) -> Double {
-        metric == .cost ? bar.totalCost : Double(bar.totalTokens)
-    }
-
-    private func segValue(_ segment: DaySegment) -> Double {
-        metric == .cost ? segment.cost : Double(segment.tokens)
     }
 
     // MARK: - Tooltip

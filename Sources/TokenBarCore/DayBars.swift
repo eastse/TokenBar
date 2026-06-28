@@ -9,12 +9,6 @@ public enum StackBy: String, Sendable, CaseIterable {
     case agent
 }
 
-/// Whether bar length encodes token count or spend.
-public enum ChartMetric: String, Sendable, CaseIterable {
-    case tokens
-    case cost
-}
-
 public struct DaySegment: Sendable {
     public let key: String
     public let label: String
@@ -96,8 +90,8 @@ public enum DayBars {
     }
 
     /// Aggregate every segment across the visible window for the legend,
-    /// heaviest-first by the active metric.
-    public static func legend(bars: [DayBar], metric: ChartMetric) -> [DaySegment] {
+    /// heaviest-first by token count.
+    public static func legend(bars: [DayBar]) -> [DaySegment] {
         var agg: [String: DaySegment] = [:]
         for bar in bars {
             for seg in bar.segments {
@@ -108,8 +102,6 @@ public enum DayBars {
                 agg[seg.key] = slot
             }
         }
-        return agg.values.sorted {
-            metric == .cost ? $0.cost > $1.cost : $0.tokens > $1.tokens
-        }
+        return agg.values.sorted { $0.tokens > $1.tokens }
     }
 }
