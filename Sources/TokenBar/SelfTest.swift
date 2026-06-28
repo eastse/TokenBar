@@ -43,6 +43,8 @@ enum SelfTest {
         expect(ISODay("1970-01-01")?.number == 0, "epoch day number")
         expect(ISODay("2026-06-10")?.iso == "2026-06-10", "iso round trip")
         expect(ISODay("garbage") == nil, "invalid iso rejected")
+        expect(Format.monthDay("2026-06-29") == "06-29", "date display uses mm-dd")
+        expect(Format.mmdd("2026-05-17") == "05-17", "date range display uses hyphen")
 
         // Streaks: longest run vs current run touching the range end.
         func perDay(_ dates: [String]) -> [String: PerDay] {

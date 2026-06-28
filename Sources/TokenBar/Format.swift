@@ -49,23 +49,36 @@ enum Format {
         graph.contributions.last(where: { $0.date == todayKey() })?.totals.cost ?? 0
     }
 
-    private static let monthsShort = [
-        "Jan", "Feb", "Mar", "Apr", "May", "Jun",
-        "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
-    ]
-
-    /// "2026-06-10" → "Jun 10".
+    /// "2026-06-10" → "06-10".
     static func monthDay(_ iso: String) -> String {
-        let parts = iso.split(separator: "-").compactMap { Int($0) }
-        guard parts.count == 3, (1...12).contains(parts[1]) else { return iso }
-        return "\(monthsShort[parts[1] - 1]) \(parts[2])"
-    }
-
-    /// "2026-06-10" → "06/10".
-    static func mmdd(_ iso: String) -> String {
         let parts = iso.split(separator: "-")
         guard parts.count == 3 else { return iso }
-        return "\(parts[1])/\(parts[2])"
+        return "\(parts[1])-\(parts[2])"
+    }
+
+    /// "2026-06-10" → "06-10".
+    static func mmdd(_ iso: String) -> String {
+        monthDay(iso)
+    }
+
+    /// RFC3339 timestamp → "06-29 00:00" in the user's local timezone.
+    static func monthDayTime(_ rfc3339: String) -> String? {
+        guard let date = parseRFC3339(rfc3339) else { return nil }
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.timeZone = .current
+        formatter.dateFormat = "MM-dd HH:mm"
+        return formatter.string(from: date)
+    }
+
+    private static func parseRFC3339(_ raw: String) -> Date? {
+        let fractional = ISO8601DateFormatter()
+        fractional.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        if let date = fractional.date(from: raw) { return date }
+
+        let plain = ISO8601DateFormatter()
+        plain.formatOptions = [.withInternetDateTime]
+        return plain.date(from: raw)
     }
 
     /// Exact token count with thousands separators ("1,234,567").

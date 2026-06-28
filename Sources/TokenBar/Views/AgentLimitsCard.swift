@@ -324,6 +324,7 @@ struct AgentLimitsCard: View {
             ? "\(Int(used.rounded()))% used"
             : "\(Int(remaining.rounded()))% left"
         let gauge = gaugeColor(remaining: remaining, brand: brand)
+        let resetLabel = resetText(for: window)
 
         if classic {
             VStack(alignment: .leading, spacing: 3) {
@@ -331,12 +332,12 @@ struct AgentLimitsCard: View {
                     Text(window.label)
                         .font(.caption2.weight(.medium))
                     Spacer()
-                    Text(window.resetText ?? leftLabel)
+                    Text(resetLabel ?? leftLabel)
                         .font(.caption2)
                         .foregroundStyle(.tertiary)
                 }
                 bar(fillPercent: fill, color: gauge, paceLeft: nil, paceIsDeficit: false)
-                if window.resetText != nil {
+                if resetLabel != nil {
                     Text(leftLabel)
                         .font(.caption2)
                         .foregroundStyle(.secondary)
@@ -348,7 +349,7 @@ struct AgentLimitsCard: View {
                     Text(window.label)
                         .font(.caption2.weight(.medium))
                     Spacer()
-                    if let reset = window.resetText {
+                    if let reset = resetLabel {
                         Text(reset)
                             .font(.caption2)
                             .foregroundStyle(.tertiary)
@@ -380,6 +381,15 @@ struct AgentLimitsCard: View {
                 }
             }
         }
+    }
+
+    private func resetText(for window: UsageWindow) -> String? {
+        if let resetsAt = window.resetsAt,
+           let exact = Format.monthDayTime(resetsAt)
+        {
+            return "Resets in \(exact)"
+        }
+        return window.resetText
     }
 
     private func placeholderRow(_ label: String, brand: String) -> some View {
