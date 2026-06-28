@@ -1,7 +1,7 @@
 import SwiftUI
 import TokenBarCore
 
-/// Client tab row (Overview + one tab per present client), port of
+/// Client tab row (All + one tab per present client), port of
 /// DashboardTabs.tsx: horizontal scroll, active tab kept in view. SVG agent
 /// icons arrive in a later phase — tabs show a brand-color disc with the
 /// client's initial, the registry fallback the web app uses for icon-less
@@ -16,7 +16,7 @@ struct DashboardTabs: View {
         ScrollViewReader { proxy in
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 4) {
-                    tab(id: "overview", label: "All", color: nil, index: 1)
+                    tab(id: "all", label: "All", color: nil, index: 1)
                     ForEach(Array(clients.enumerated()), id: \.element) { i, id in
                         let style = ClientRegistry.style(id)
                         tab(
@@ -40,7 +40,7 @@ struct DashboardTabs: View {
             active = id
         } label: {
             HStack(spacing: 5) {
-                if id == "overview" {
+                if id == "all" {
                     allIcon
                 } else if color != nil {
                     AgentIconView(clientId: id, size: 14)

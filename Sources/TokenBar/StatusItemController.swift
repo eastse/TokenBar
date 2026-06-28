@@ -165,7 +165,7 @@ final class StatusItemController: NSObject {
             let attr = NSMutableAttributedString()
             for (i, line) in lines.enumerated() {
                 if i > 0 { attr.append(NSAttributedString(string: "\n")) }
-                var attrs: [NSAttributedString.Key: Any] = [
+                let attrs: [NSAttributedString.Key: Any] = [
                     .font: font,
                     .paragraphStyle: para,
                     // NSStatusBarButton aligns multi-line attributedTitle by

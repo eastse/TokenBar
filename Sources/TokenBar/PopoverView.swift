@@ -22,14 +22,14 @@ struct PopoverView: View {
     @AppStorage("tokenbar.chart.view") private var chartViewRaw = "2d"
     @AppStorage("tokenbar.view") private var activeViewRaw = AppView.overview.rawValue
     @AppStorage("tokenbar.bridge.dismissed") private var bridgeDismissed = false
-    /// "overview" or a client id. Persisted so the selection survives the
+    /// "all" or a client id. Persisted so the selection survives the
     /// popover's rootView teardown/rebuild cycle (StatusItemController swaps
     /// the live view for a placeholder on close).
     /// `--tab=<id>` preselects a client tab (debug/screenshot aid).
     @AppStorage("tokenbar.activeTab") private var activeTab =
         CommandLine.arguments
             .first(where: { $0.hasPrefix("--tab=") })
-            .map { String($0.dropFirst("--tab=".count)) } ?? "overview"
+            .map { String($0.dropFirst("--tab=".count)) } ?? "all"
 
     private var activeView: Binding<AppView> {
         Binding(
@@ -91,7 +91,9 @@ struct PopoverView: View {
             if let tabArg = CommandLine.arguments
                 .first(where: { $0.hasPrefix("--tab=") })
                 .map({ String($0.dropFirst("--tab=".count)) }) {
-                activeTab = tabArg
+                activeTab = tabArg == "overview" ? "all" : tabArg
+            } else if activeTab == "overview" {
+                activeTab = "all"
             }
         }
         .onDisappear { removeKeyMonitors() }
@@ -99,10 +101,10 @@ struct PopoverView: View {
         // attached to the always-present root, not the tab row (which is hidden
         // when only one client is present), so a saved client id that no longer
         // exists can't strand the dashboard on an empty single-client slice
-        // with no visible tab row to return to Overview.
+        // with no visible tab row to return to All.
         .onChange(of: model.stats?.presentClients) { _, clients in
-            if activeTab != "overview", let clients, !clients.contains(activeTab) {
-                activeTab = "overview"
+            if activeTab != "all", let clients, !clients.contains(activeTab) {
+                activeTab = "all"
             }
         }
     }
@@ -274,7 +276,7 @@ struct PopoverView: View {
 
     @ViewBuilder private var lensContent: some View {
         if let payload = model.payload, let stats = model.stats {
-            let singleClient = activeTab == "overview" ? nil : activeTab
+            let singleClient = activeTab == "all" ? nil : activeTab
             let clientIds = singleClient.map { [$0] } ?? stats.presentClients
             let activeStats = singleClient == nil
                 ? stats
@@ -416,7 +418,7 @@ struct PopoverView: View {
         guard mods == .command, let chars = event.charactersIgnoringModifiers?.lowercased()
         else { return false }
 
-        let tabs = ["overview"] + (model.stats?.presentClients ?? [])
+        let tabs = ["all"] + (model.stats?.presentClients ?? [])
         switch chars {
         case "1", "2", "3", "4", "5", "6", "7", "8", "9":
             let index = Int(chars)! - 1
