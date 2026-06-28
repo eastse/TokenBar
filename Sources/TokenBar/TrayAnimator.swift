@@ -18,12 +18,8 @@ final class TrayAnimator {
     private let frames: [String: [NSImage]]
     private var animationTask: Task<Void, Never>?
     private var loadTask: Task<Void, Never>?
-    private var quotaTask: Task<Void, Never>?
     /// RunCat load signal in [0, 100]: tokens/min ÷ 10K, so 1M tok/min = 100.
     private var load: Double = 0
-    /// Latest OAuth quota snapshot — feeds the gauge icon styles and the
-    /// quota title mode (AppDelegate reads it through `quotaRemaining`).
-    private(set) var quota: AgentUsagePayload?
     /// Latest live trace, refreshed alongside the load poll. Only consulted
     /// when the user picks the "Following (last used)" quota source; kept on
     /// hand so resolving doesn't pay a synchronous FFI hop per render pass.
@@ -57,6 +53,7 @@ final class TrayAnimator {
     }
 
     private var defaultsObserver: NSObjectProtocol?
+    private var agentUsageObserver: NSObjectProtocol?
     /// Snapshot of the icon-affecting defaults the observer reacts to. The
     /// global didChangeNotification carries no key and fires for every write
     /// (popover height, active tab, year, quota cache…), so we compare this
@@ -79,7 +76,6 @@ final class TrayAnimator {
     func start() {
         startAnimationLoop()
         startLoadPolling()
-        startQuotaPolling()
         iconSettingsSignature = Self.currentIconSignature()
         // Re-render the gauge and restart the animation loop the moment an
         // icon setting changes (style, animate, quota source, coloring) — the
@@ -106,13 +102,25 @@ final class TrayAnimator {
             self?.renderCurrentIcon()
             self?.onQuotaUpdated?()
         }
+        agentUsageObserver = NotificationCenter.default.addObserver(
+            forName: AgentUsageStore.didUpdateNotification, object: nil, queue: .main
+        ) { [weak self] _ in
+            MainActor.assumeIsolated {
+                guard let self else { return }
+                self.renderCurrentIcon()
+                self.persistRemaining()
+                self.onQuotaUpdated?()
+            }
+        }
     }
 
     func stop() {
         animationTask?.cancel()
         loadTask?.cancel()
-        quotaTask?.cancel()
         if let defaultsObserver { NotificationCenter.default.removeObserver(defaultsObserver) }
+        if let agentUsageObserver { NotificationCenter.default.removeObserver(agentUsageObserver) }
+        defaultsObserver = nil
+        agentUsageObserver = nil
         controller?.onAppearanceChanged = nil
     }
 
@@ -168,7 +176,8 @@ final class TrayAnimator {
     var quotaRemaining: Double? {
         let selection = QuotaResolver.normalizeSelection(
             UserDefaults.standard.string(forKey: Self.quotaSourceKey))
-        if let value = QuotaResolver.resolve(payload: quota, trace: trace, selection: selection)?
+        if let value = QuotaResolver.resolve(
+            payload: AgentUsageStore.shared.payload, trace: trace, selection: selection)?
             .window.remainingPercent
         {
             cachedQuotaRemaining = value
@@ -201,7 +210,7 @@ final class TrayAnimator {
     var quotaWindows: [(label: String, remaining: Double)] {
         let selection = QuotaResolver.normalizeSelection(
             UserDefaults.standard.string(forKey: Self.quotaSourceKey))
-        guard let payload = quota,
+        guard let payload = AgentUsageStore.shared.payload,
               let agent = QuotaResolver.resolveAgent(
                 payload: payload, trace: trace, selection: selection)
         else { return [] }
@@ -213,7 +222,8 @@ final class TrayAnimator {
     private var currentAgent: AgentUsageSnapshot? {
         let selection = QuotaResolver.normalizeSelection(
             UserDefaults.standard.string(forKey: Self.quotaSourceKey))
-        return QuotaResolver.resolveAgent(payload: quota, trace: trace, selection: selection)
+        return QuotaResolver.resolveAgent(
+            payload: AgentUsageStore.shared.payload, trace: trace, selection: selection)
     }
 
     private var currentAgentId: String? {
@@ -294,27 +304,6 @@ final class TrayAnimator {
                 self.controller?.setFrame(set[index % set.count])
                 index = (index + 1) % set.count
                 try? await Task.sleep(for: self.frameInterval)
-            }
-        }
-    }
-
-    /// OAuth quota fetch is network-bound (~30s worst case across four
-    /// providers), so refresh on a 5-minute cadence — quota windows move
-    /// slowly and the popover has its own faster loop while open.
-    private func startQuotaPolling() {
-        quotaTask = Task { [weak self] in
-            while !Task.isCancelled {
-                let payload = try? await Task.detached(priority: .utility) {
-                    try TBCore.agentUsage()
-                }.value
-                guard let self, !Task.isCancelled else { break }
-                if let payload {
-                    self.quota = payload
-                    self.renderCurrentIcon() // refreshes cachedQuotaRemaining
-                    self.persistRemaining()
-                    self.onQuotaUpdated?()
-                }
-                try? await Task.sleep(for: .seconds(300))
             }
         }
     }

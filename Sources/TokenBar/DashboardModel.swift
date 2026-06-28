@@ -297,16 +297,19 @@ private struct DashboardSnapshot {
         }
     }
 
-    /// Poll the OAuth quota snapshots while the popover is open. The fetch is
-    /// network-bound (up to ~30s when a provider hangs), so failures keep the
-    /// previous payload; per-provider errors live inside each snapshot.
+    /// Sync the shared OAuth quota snapshots while the popover/settings window
+    /// is open. The global store coalesces requests, enforces the 60s foreground
+    /// reuse window, and skips network quota queries when local token usage has
+    /// not changed.
     func pollAgentUsage() async {
         while !Task.isCancelled {
-            let payload = try? await Task.detached(priority: .utility) {
-                try TBCore.agentUsage()
-            }.value
+            if let payload = AgentUsageStore.shared.payload {
+                agentUsage = payload
+                refreshSnapshotLiveData()
+            }
+            await AgentUsageStore.shared.refreshIfStale(maxAge: 60)
             if Task.isCancelled { break }
-            if let payload {
+            if let payload = AgentUsageStore.shared.payload {
                 agentUsage = payload
                 refreshSnapshotLiveData() // keep the reopen cache's quota cards current
             }

@@ -32,9 +32,10 @@ struct SettingsWindowView: View {
                     .background(OverlayScrollerEnforcer())
             }
             .scrollIndicators(.never)
-            .frame(width: 330)
+            .frame(minWidth: 300, maxWidth: .infinity)
         }
-        .frame(width: 685, height: 580)
+        .frame(minWidth: 685, minHeight: 580)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(PopoverBackdrop().ignoresSafeArea())
         .task { await model.load() }
         .task { await model.pollAgentUsage() }

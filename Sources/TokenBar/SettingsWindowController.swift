@@ -13,6 +13,7 @@ final class SettingsWindowController {
     // AnyView so the live UI can be swapped for a static placeholder on close.
     private var host: NSHostingController<AnyView>?
     private var closeObserver: NSObjectProtocol?
+    private var initialResizeObserver: NSObjectProtocol?
 
     func show() {
         let existing = self.window
@@ -60,7 +61,10 @@ final class SettingsWindowController {
         // SwiftUI fitting size up front.
         window.setContentSize(host.view.fittingSize)
         window.title = "TokenBar Settings"
-        window.styleMask = [.titled, .closable, .miniaturizable, .fullSizeContentView]
+        window.styleMask = [
+            .titled, .closable, .miniaturizable, .resizable, .fullSizeContentView,
+        ]
+        window.contentMinSize = NSSize(width: 685, height: 580)
         // The glass backdrop runs under the title bar (the popover look);
         // scroll views inset their content via the safe area.
         window.titlebarAppearsTransparent = true
@@ -73,7 +77,8 @@ final class SettingsWindowController {
             forName: NSWindow.willCloseNotification, object: window, queue: .main
         ) { [weak self] _ in
             MainActor.assumeIsolated {
-                self?.host?.rootView = AnyView(Color.clear.frame(width: 685, height: 580))
+                self?.host?.rootView = AnyView(
+                    Color.clear.frame(minWidth: 685, minHeight: 580))
             }
         }
         // The hosting view inflates the frame by the title-bar safe area
@@ -81,13 +86,17 @@ final class SettingsWindowController {
         // amount of layoutIfNeeded forces early — re-center once when it
         // lands so the first open sits dead-center (one-shot; later opens
         // start from the final size and never resize again).
-        var token: NSObjectProtocol?
-        token = NotificationCenter.default.addObserver(
+        initialResizeObserver = NotificationCenter.default.addObserver(
             forName: NSWindow.didResizeNotification, object: window, queue: .main
         ) { [weak self] notification in
-            if let token { NotificationCenter.default.removeObserver(token) }
             guard let window = notification.object as? NSWindow else { return }
-            MainActor.assumeIsolated { self?.center(window) }
+            MainActor.assumeIsolated {
+                if let token = self?.initialResizeObserver {
+                    NotificationCenter.default.removeObserver(token)
+                    self?.initialResizeObserver = nil
+                }
+                self?.center(window)
+            }
         }
         return window
     }

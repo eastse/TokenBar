@@ -53,10 +53,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         statusController = controller
         let animator = TrayAnimator(controller: controller)
         trayAnimator = animator
-        controller.quotaPayloadProvider = { [weak animator] in animator?.quota }
+        controller.quotaPayloadProvider = { AgentUsageStore.shared.payload }
         // A fresh quota or rate fetch re-renders the title right away.
         animator.onQuotaUpdated = { [weak self] in self?.applyTitle() }
         animator.start()
+        AgentUsageStore.shared.startPolling(every: 300)
         startTitleRefresh()
 
         // Re-render the title the moment any setting changes (tray mode, quota
@@ -98,6 +99,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationWillTerminate(_ notification: Notification) {
         titleRefreshTask?.cancel()
         trayAnimator?.stop()
+        AgentUsageStore.shared.stopPolling()
         if let defaultsObserver { NotificationCenter.default.removeObserver(defaultsObserver) }
         // Remove the status item / close the popover so ControlCenter tears
         // the menu-bar item down cleanly (avoids the ~40s RunningBoard
