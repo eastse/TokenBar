@@ -3,21 +3,16 @@ import TokenBarCore
 
 /// The "Token Usage" card, port of UsageBarGraph2D.tsx: trailing-30-day
 /// stacked bars (Model/Agent stacking, Tokens/Price metric, wrapping legend,
-/// rich hover tooltip) toggling with the full-year 3D contribution grid.
+/// rich hover tooltip).
 struct UsageChartCard: View {
     let payload: UsagePayload
     /// Clients included in the stack (the active tab's slice).
     let clientIds: [String]
     let stats: UsageStats
     let colors: ModelColorMap
-    /// Dashboard year filter; nil (all time) falls back to the current year
-    /// for the 3D grid, which is inherently single-year.
-    var year: String?
 
     @AppStorage("tokenbar.chart.stackBy") private var stackByRaw = StackBy.model.rawValue
     @AppStorage("tokenbar.chart.metric") private var metricRaw = ChartMetric.tokens.rawValue
-    /// "2d" = trailing-30-day stacked bars, "3d" = full-year contribution grid.
-    @AppStorage("tokenbar.chart.view") private var chartViewRaw = "2d"
     @State private var hoverIndex: Int?
     @State private var hoverY: CGFloat = 0
     @State private var tooltipSize: CGSize = .zero
@@ -35,64 +30,35 @@ struct UsageChartCard: View {
             colors: colors, endFallback: Format.todayKey())
     }
 
-    private var is3D: Bool { chartViewRaw == "3d" }
-
     var body: some View {
         let bars = self.bars
         let legend = DayBars.legend(bars: bars, metric: metric)
         DashCard(
             "Token Usage",
-            subtitle: is3D
-                ? "Full year"
-                : (stackBy == .model ? "Stacked by model" : "Stacked by agent"),
+            subtitle: stackBy == .model ? "Stacked by model" : "Stacked by agent",
             trailing: { toggles }
         ) {
-            togglesRow
             TokenUsageRow(stats: stats)
-            if is3D {
-                // Year grid over the same client slice; sized to match the 2D
-                // legend + chart + axis block so the card doesn't jump.
-                ContributionGraph3D(
-                    grid: buildGrid(
-                        year: year ?? String(Format.todayKey().prefix(4)),
-                        perDayMap: stats.perDayMap)
-                )
-                .frame(height: 196)
-            } else {
-                legendView(legend)
-                chart(bars)
-                HStack {
-                    axisLabel(bars.first?.date)
-                    Spacer()
-                    axisLabel(bars.last?.date)
-                }
+            legendView(legend)
+            chart(bars)
+            HStack {
+                axisLabel(bars.first?.date)
+                Spacer()
+                axisLabel(bars.last?.date)
             }
         }
     }
 
     // MARK: - Header toggles
 
-    /// The 2D/3D view switch rides the header; the 2D-only group/metric
-    /// toggles get their own slim row below — stacked in the header they made
-    /// it three rows tall and left the card top mostly whitespace, and all
-    /// three don't fit beside the title without wrapping.
     private var toggles: some View {
-        picker(selection: $chartViewRaw, options: [("2d", "2D"), ("3d", "3D")])
-    }
-
-    @ViewBuilder private var togglesRow: some View {
-        // Stacking and bar metric are 2D-only concepts — the 3D view is the
-        // year heatmap (web hides these the same way).
-        if !is3D {
-            HStack(spacing: 4) {
-                Spacer()
-                picker(selection: $stackByRaw, options: [
-                    (StackBy.model.rawValue, "Model"), (StackBy.agent.rawValue, "Agent"),
-                ])
-                picker(selection: $metricRaw, options: [
-                    (ChartMetric.tokens.rawValue, "Tokens"), (ChartMetric.cost.rawValue, "Price"),
-                ])
-            }
+        HStack(spacing: 4) {
+            picker(selection: $stackByRaw, options: [
+                (StackBy.model.rawValue, "Model"), (StackBy.agent.rawValue, "Agent"),
+            ])
+            picker(selection: $metricRaw, options: [
+                (ChartMetric.tokens.rawValue, "Tokens"), (ChartMetric.cost.rawValue, "Price"),
+            ])
         }
     }
 

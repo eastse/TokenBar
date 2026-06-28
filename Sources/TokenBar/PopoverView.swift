@@ -19,7 +19,6 @@ struct PopoverView: View {
     @State private var keyMonitor: Any?
     @State private var flagsMonitor: Any?
     @State private var cmdHintTask: Task<Void, Never>?
-    @AppStorage("tokenbar.chart.view") private var chartViewRaw = "2d"
     @AppStorage("tokenbar.view") private var activeViewRaw = AppView.overview.rawValue
     @AppStorage("tokenbar.bridge.dismissed") private var bridgeDismissed = false
     /// "all" or a client id. Persisted so the selection survives the
@@ -287,7 +286,7 @@ struct PopoverView: View {
                     payload: payload, clientIds: clientIds, stats: activeStats,
                     modelReport: model.modelReport, colors: model.colors,
                     trace: model.trace, agentUsage: model.agentUsage,
-                    singleClient: singleClient, year: model.year)
+                    singleClient: singleClient)
             case .models:
                 ModelsView(
                     report: model.modelReport, clientIds: clientIds, colors: model.colors)
@@ -300,8 +299,7 @@ struct PopoverView: View {
             case .stats:
                 StatsView(
                     payload: payload, clientIds: clientIds, stats: activeStats,
-                    modelReport: model.modelReport, colors: model.colors,
-                    year: model.year)
+                    modelReport: model.modelReport, colors: model.colors)
             case .agents:
                 AgentsView(report: model.agents, clientIds: clientIds)
             }
@@ -378,7 +376,7 @@ struct PopoverView: View {
 
     /// The web app's Cmd shortcuts (App.tsx onKeyDown), as local NSEvent
     /// monitors scoped to the popover's key window: ⌘1-9 tabs, ⌘[/⌘] cycle,
-    /// ⌘, settings, ⌘R refresh, ⌘G 2D/3D, ⌘W/Esc close, ⌘Q quit. Holding Cmd
+    /// ⌘, settings, ⌘R refresh, ⌘W/Esc close, ⌘Q quit. Holding Cmd
     /// alone for 400ms reveals the tab pins (system chords like ⌘⇧4 don't).
     private func installKeyMonitors() {
         guard keyMonitor == nil else { return }
@@ -436,8 +434,6 @@ struct PopoverView: View {
             NSApp.terminate(nil)
         case "r":
             Task { await model.refresh() }
-        case "g":
-            chartViewRaw = chartViewRaw == "2d" ? "3d" : "2d"
         default:
             return false
         }

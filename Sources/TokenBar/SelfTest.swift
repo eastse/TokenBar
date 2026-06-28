@@ -104,23 +104,6 @@ enum SelfTest {
         expect(UsagePace.durationText(130 * 60) == "2h 10m", "duration text h m")
         expect(UsagePace.durationText(26 * 3600) == "1d 2h", "duration text d h")
 
-        // Contribution grid: GitHub layout, col 0 row 0 = Sunday on/before
-        // Jan 1; out-of-year cells are never active; max tracks active only.
-        expect(ISODay("1970-01-01")?.weekday == 4, "epoch day is Thursday")
-        expect(ISODay("2026-06-07")?.weekday == 0, "2026-06-07 is Sunday")
-        let grid = buildGrid(
-            year: "2026",
-            perDayMap: [
-                "2026-01-01": PerDay(date: "2026-01-01", tokens: 500, cost: 1, messages: 0, intensity: 1),
-                "2025-12-29": PerDay(date: "2025-12-29", tokens: 900, cost: 1, messages: 0, intensity: 1),
-            ])
-        expect(grid.rows == 7 && grid.cols >= 53 && grid.cells.count == grid.cols * 7, "grid shape")
-        expect(grid.cells.first?.date == "2025-12-28" && grid.cells.first?.inYear == false, "grid starts on the prior Sunday")
-        let jan1 = grid.cells.first { $0.date == "2026-01-01" }
-        expect(jan1?.col == 0 && jan1?.row == 4 && jan1?.active == true, "jan 1 lands on Thursday row")
-        expect(grid.maxTokens == 500, "out-of-year tokens don't drive max")
-        expect(grid.cells.first { $0.date == "2025-12-29" }?.active == false, "out-of-year cell inactive")
-
         // Trace collapse: one row per client, agents/models joined sorted,
         // "unknown" dropped when named models exist, rows sorted by tokens.
         func bucket(_ client: String, _ agent: String, _ model: String, _ tokens: Int64) -> TraceBucket {

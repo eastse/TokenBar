@@ -35,11 +35,7 @@ back to [RunCat](https://kyome.io/runcat/) by Takuto Nakamura.
 
 Click the icon and a Liquid Glass popover opens. A row of **app tabs** filters
 _which_ agents you're looking at; a **view switch** picks _how_ that data is
-broken down — six lenses, plus the same year of usage as an orbitable 3D graph.
-
-<p align="center">
-  <img src="docs/screenshots/graph-3d.png" alt="Interactive 3D contribution graph" width="400">
-</p>
+broken down — six lenses over the same local usage data.
 
 <table>
   <tr>
@@ -57,7 +53,7 @@ broken down — six lenses, plus the same year of usage as an orbitable 3D graph
 </table>
 
 Plus **OAuth quota cards** with pace projections, a live session trace, streaks,
-and full keyboard control (⌘1–9 tabs, ⌘G chart toggle, ⌘, settings). A failed
+and full keyboard control (⌘1–9 tabs, ⌘, settings). A failed
 refresh never blanks a reading — the last known value stays until a fresh one
 lands.
 

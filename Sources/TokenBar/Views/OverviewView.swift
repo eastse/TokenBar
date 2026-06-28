@@ -14,8 +14,6 @@ struct OverviewView: View {
     let agentUsage: AgentUsagePayload?
     /// Set when this view shows a single client's slice.
     var singleClient: String?
-    /// Dashboard year filter (nil = all time), forwarded to the chart card.
-    var year: String?
 
     var body: some View {
         VStack(spacing: 12) {
@@ -44,7 +42,6 @@ struct OverviewView: View {
 
     private var chart: some View {
         UsageChartCard(
-            payload: payload, clientIds: clientIds, stats: stats, colors: colors,
-            year: year)
+            payload: payload, clientIds: clientIds, stats: stats, colors: colors)
     }
 }

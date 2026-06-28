@@ -11,8 +11,6 @@ struct StatsView: View {
     let stats: UsageStats
     let modelReport: ModelReport?
     let colors: ModelColorMap
-    /// Dashboard year filter (nil = all time), forwarded to the chart card.
-    var year: String?
 
     private var favorite: ModelReportEntry? {
         let allow = Set(clientIds)
@@ -24,8 +22,7 @@ struct StatsView: View {
     var body: some View {
         VStack(spacing: 12) {
             UsageChartCard(
-                payload: payload, clientIds: clientIds, stats: stats, colors: colors,
-                year: year)
+                payload: payload, clientIds: clientIds, stats: stats, colors: colors)
             summaryCard
         }
     }

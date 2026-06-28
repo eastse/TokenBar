@@ -3,7 +3,7 @@ import AppKit
 /// One-shot import of settings from the retired beta identity
 /// (com.nyanako.tokenbar.beta, "TokenBar Beta.app"). Runs before anything
 /// reads defaults so the first launch of the stable app keeps the user's
-/// tray mode, icon style, quota source, chart view, orbit camera, etc.
+/// tray mode, icon style, quota source, and other TokenBar settings.
 ///
 /// Only `tokenbar.*` keys are copied (everything we own is under that
 /// prefix), existing values in the stable domain are never overwritten,
@@ -58,6 +58,7 @@ enum BridgeBuild {
     /// the cask install in Terminal (beta installs always have Homebrew —
     /// that's how they got here), then quit so the freshly-installed release
     /// app (same data dir, settings imported on first launch) takes over.
+    @MainActor
     static func switchToRelease() {
         let releasePath = "/Applications/TokenBar.app"
         if FileManager.default.fileExists(atPath: releasePath) {
