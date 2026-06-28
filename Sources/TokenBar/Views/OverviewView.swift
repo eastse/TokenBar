@@ -36,7 +36,6 @@ struct OverviewView: View {
                 ModelBreakdownCard(
                     report: modelReport, clientIds: clientIds, colors: colors)
             }
-            StreaksCard(streaks: stats.streaks)
         }
     }
 

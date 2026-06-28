@@ -135,28 +135,3 @@ struct TokenUsageRow: View {
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 }
-
-/// Streak summary card, ported from StreaksCard.tsx.
-struct StreaksCard: View {
-    let streaks: Streaks
-
-    var body: some View {
-        DashCard("Streaks") {
-            HStack(spacing: 8) {
-                item(streaks.longest, "Longest")
-                item(streaks.current, "Current")
-            }
-        }
-    }
-
-    private func item(_ days: Int, _ label: String) -> some View {
-        VStack(alignment: .leading, spacing: 2) {
-            (Text("\(days)").font(.system(size: 17, weight: .semibold).monospacedDigit())
-                + Text(" days").font(.caption).foregroundStyle(.secondary))
-            Text(label)
-                .font(.caption)
-                .foregroundStyle(.secondary)
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-    }
-}

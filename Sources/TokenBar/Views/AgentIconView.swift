@@ -29,6 +29,9 @@ enum AgentIconImage {
     /// Full icons whose mark is dark and mostly transparent, so they need a
     /// light disc behind to stay visible on a dark popover.
     fileprivate static let lightBackedIds: Set<String> = ["cline"]
+    fileprivate static let iconBackgrounds: [String: String] = [
+        "codex": "#74aa9c",
+    ]
 
     /// Resolve the id whose `agent-icons/<id>.svg` should render for a client.
     fileprivate static func iconId(_ clientId: String) -> String {
@@ -118,7 +121,7 @@ enum AgentIconImage {
             source.draw(in: rect, from: .zero, operation: .sourceOver, fraction: 1)
             NSGraphicsContext.current?.restoreGraphicsState()
         } else {
-            NSColor(hex: style.color).setFill()
+            NSColor(hex: iconBackgrounds[iconId] ?? style.color).setFill()
             NSBezierPath(ovalIn: rect).fill()
 
             if monoIds.contains(iconId), let source = sourceImage(iconId) {
@@ -253,7 +256,7 @@ struct AgentIconView: View {
                         .clipShape(Circle())
                 }
             } else {
-                Circle().fill(Color(hex: style.color))
+                Circle().fill(Color(hex: AgentIconImage.iconBackgrounds[iconId] ?? style.color))
                 if AgentIconImage.monoIds.contains(iconId),
                    let image = AgentIconImage.sourceImage(iconId)
                 {
