@@ -71,6 +71,16 @@ enum Format {
         return formatter.string(from: date)
     }
 
+    /// RFC3339 timestamp → "14:58" in the user's local timezone.
+    static func hourMinute(_ rfc3339: String) -> String? {
+        guard let date = parseRFC3339(rfc3339) else { return nil }
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.timeZone = .current
+        formatter.dateFormat = "HH:mm"
+        return formatter.string(from: date)
+    }
+
     private static func parseRFC3339(_ raw: String) -> Date? {
         let fractional = ISO8601DateFormatter()
         fractional.formatOptions = [.withInternetDateTime, .withFractionalSeconds]

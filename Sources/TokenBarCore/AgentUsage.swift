@@ -3,12 +3,12 @@ import Foundation
 // OAuth quota cards (`AgentUsagePayload` in the Tauri frontend's
 // src/lib/agentUsage.ts).
 
-public struct AgentIdentity: Decodable, Sendable {
+public struct AgentIdentity: Codable, Sendable {
     public let email: String?
     public let plan: String?
 }
 
-public struct UsageWindow: Decodable, Sendable {
+public struct UsageWindow: Codable, Sendable {
     public let label: String
     public let usedPercent: Double
     public let remainingPercent: Double
@@ -40,12 +40,12 @@ public struct UsageWindow: Decodable, Sendable {
     }
 }
 
-public struct CreditsSnapshot: Decodable, Sendable {
+public struct CreditsSnapshot: Codable, Sendable {
     public let remaining: Double?
     public let unlimited: Bool
 }
 
-public struct AgentUsageSnapshot: Decodable, Sendable {
+public struct AgentUsageSnapshot: Codable, Sendable {
     public let clientId: String
     public let source: String
     public let updatedAt: String
@@ -55,10 +55,20 @@ public struct AgentUsageSnapshot: Decodable, Sendable {
     public let error: String?
 }
 
-public struct AgentUsagePayload: Decodable, Sendable {
+public struct AgentUsagePayload: Codable, Sendable {
     public let generatedAt: String
     public let agents: [AgentUsageSnapshot]
     /// Subscription-type providers opencode is authed against (e.g. ["Codex"]).
     /// Omitted from the JSON entirely when empty.
     public let opencodeSubscriptions: [String]?
+
+    public init(
+        generatedAt: String,
+        agents: [AgentUsageSnapshot],
+        opencodeSubscriptions: [String]? = nil
+    ) {
+        self.generatedAt = generatedAt
+        self.agents = agents
+        self.opencodeSubscriptions = opencodeSubscriptions
+    }
 }

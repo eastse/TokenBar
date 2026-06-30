@@ -14,8 +14,11 @@ import TokenBarCore
     private var pollTask: Task<Void, Never>?
     private var lastRequestAt: Date?
     private var lastUsageSignature: Int64?
+    private static let cacheKey = "tokenbar.agentUsage.lastPayload"
 
-    private init() {}
+    private init() {
+        payload = Self.loadCachedPayload()
+    }
 
     func startPolling(every seconds: TimeInterval) {
         pollTask?.cancel()
@@ -71,8 +74,9 @@ import TokenBarCore
         if let usageSignature {
             lastUsageSignature = usageSignature
         }
-        if let next {
-            payload = next
+        if let displayPayload = Self.displayPayload(next: next, fallback: payload) {
+            payload = displayPayload
+            Self.saveCachedPayload(displayPayload)
             NotificationCenter.default.post(name: Self.didUpdateNotification, object: self)
         }
     }
@@ -81,5 +85,46 @@ import TokenBarCore
         await Task.detached(priority: .utility) {
             try? TBCore.graph().summary.totalTokens
         }.value
+    }
+
+    private static func displayPayload(
+        next: AgentUsagePayload?,
+        fallback: AgentUsagePayload?
+    ) -> AgentUsagePayload? {
+        guard let next else { return fallback }
+        guard let fallback else { return next }
+
+        let cached = Dictionary(
+            fallback.agents.map { ($0.clientId, $0) },
+            uniquingKeysWith: { first, _ in first })
+        let agents = next.agents.map { agent in
+            if agent.error != nil,
+               let cachedAgent = cached[agent.clientId],
+               isUsable(cachedAgent)
+            {
+                return cachedAgent
+            }
+            return agent
+        }
+        return AgentUsagePayload(
+            generatedAt: next.generatedAt,
+            agents: agents,
+            opencodeSubscriptions: next.opencodeSubscriptions ?? fallback.opencodeSubscriptions)
+    }
+
+    private static func isUsable(_ snapshot: AgentUsageSnapshot) -> Bool {
+        snapshot.error == nil && (!snapshot.windows.isEmpty || snapshot.credits != nil)
+    }
+
+    private static func loadCachedPayload() -> AgentUsagePayload? {
+        guard let data = UserDefaults.standard.data(forKey: cacheKey) else { return nil }
+        return try? JSONDecoder().decode(AgentUsagePayload.self, from: data)
+    }
+
+    private static func saveCachedPayload(_ payload: AgentUsagePayload) {
+        guard payload.agents.contains(where: isUsable) else { return }
+        if let data = try? JSONEncoder().encode(payload) {
+            UserDefaults.standard.set(data, forKey: cacheKey)
+        }
     }
 }

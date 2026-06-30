@@ -237,12 +237,26 @@ struct AgentLimitsCard: View {
                 Spacer()
                 statusBadge(snapshot: snapshot, isLive: isLive)
             }
-            if let detail = detailText(snapshot) {
-                Text(detail)
-                    .font(.caption2)
-                    .foregroundStyle(snapshot?.error != nil ? .red : .secondary)
-                    .lineLimit(2)
-                    .help(snapshot?.error ?? detail)
+            let detail = detailText(snapshot)
+            let updated = lastUpdatedText(snapshot)
+            if detail != nil || updated != nil {
+                HStack(alignment: .firstTextBaseline, spacing: 8) {
+                    if let detail {
+                        Text(detail)
+                            .font(.caption2)
+                            .foregroundStyle(snapshot?.error != nil ? .red : .secondary)
+                            .lineLimit(2)
+                            .help(snapshot?.error ?? detail)
+                    }
+                    Spacer(minLength: 8)
+                    if let updated {
+                        Text(updated)
+                            .font(.caption2.weight(.medium))
+                            .foregroundStyle(.tertiary)
+                            .monospacedDigit()
+                            .help("Last quota update \(updated)")
+                    }
+                }
             }
             VStack(spacing: 8) {
                 if let snapshot, !snapshot.windows.isEmpty {
@@ -297,6 +311,11 @@ struct AgentLimitsCard: View {
         if let error = snapshot.error { return error }
         let parts = [snapshot.identity?.email, snapshot.identity?.plan].compactMap(\.self)
         return parts.isEmpty ? nil : parts.joined(separator: " · ")
+    }
+
+    private func lastUpdatedText(_ snapshot: AgentUsageSnapshot?) -> String? {
+        guard let snapshot, snapshot.error == nil else { return nil }
+        return Format.hourMinute(snapshot.updatedAt)
     }
 
     // MARK: - Window rows
